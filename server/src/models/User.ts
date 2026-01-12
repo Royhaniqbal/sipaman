@@ -1,24 +1,43 @@
-// src/models/User.ts
-import mongoose, { Schema, Document, Model } from "mongoose";
+import { DataTypes, Model } from "sequelize";
+import { sequelize } from "../db";
 
-export interface IUser extends Document {
-  username: string;
-  email: string;
-  password: string;
-  role: "user" | "admin";
+class User extends Model {
+  public id!: number;
+  public username!: string;
+  public email!: string;
+  public password!: string;
+  public role!: string;
+  public unitKerja!: string; // ✅ Menambahkan properti di class
 }
 
-const UserSchema: Schema<IUser> = new Schema<IUser>(
+User.init(
   {
-    username: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    username: { type: DataTypes.STRING, allowNull: false },
+    email: { 
+      type: DataTypes.STRING, 
+      allowNull: false, 
+      unique: true,
+      validate: { isEmail: true }
+    },
+    password: { type: DataTypes.STRING, allowNull: false },
+    role: { type: DataTypes.STRING, defaultValue: "user" },
+    unitKerja: {
+      type: DataTypes.STRING,
+      allowNull: false, // Wajib diisi saat registrasi
+      comment: "Unit kerja user: Setditjen-URT, Bina Stankom, dll"
+    },
   },
-  { timestamps: true }
+  {
+    sequelize,
+    modelName: "User",
+    tableName: "users",
+    timestamps: false, // ✅ Mematikan createdAt & updatedAt
+  }
 );
 
-const User: Model<IUser> =
-  mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
-
-export default mongoose.model('User', UserSchema);
+export default User;

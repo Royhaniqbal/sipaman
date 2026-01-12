@@ -1,13 +1,14 @@
 // src/components/ManageTab.tsx
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { LogOut } from "lucide-react";
+import { LogOut, Building2 } from "lucide-react"; // Tambah icon Building jika ingin digunakan
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
 export default function ManageTab() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [unitKerja, setUnitKerja] = useState(""); // 🔹 State Baru
 
   // ✅ Fetch data user dari backend
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function ManageTab() {
 
         setUsername(fetchedUser.username || "");
         setEmail(fetchedUser.email || "");
+        setUnitKerja(fetchedUser.unitKerja || ""); // 🔹 Ambil Unit Kerja
       } catch (err: any) {
         console.error(
           "❌ Failed to fetch user:",
@@ -60,8 +62,22 @@ export default function ManageTab() {
             type="text"
             value={username}
             readOnly
-            className="w-full p-2 border rounded-lg bg-gray-100 cursor-not-allowed"
+            className="w-full p-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
           />
+        </div>
+
+        {/* 🔹 Unit Kerja Readonly (Ditambahkan di bawah Username) */}
+        <div>
+          <label className="block mb-1 font-medium">Unit Kerja</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={unitKerja}
+              readOnly
+              className="w-full p-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+              placeholder="Data unit kerja tidak ditemukan"
+            />
+          </div>
         </div>
 
         <div>
@@ -70,16 +86,18 @@ export default function ManageTab() {
             type="email"
             value={email}
             readOnly
-            className="w-full p-2 border rounded-lg bg-gray-100 cursor-not-allowed"
+            className="w-full p-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
           />
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="w-full py-2 flex items-center justify-center gap-2 bg-red-600 text-white rounded-lg font-semibold"
-        >
-          <LogOut size={18} /> Logout
-        </button>
+        <div className="pt-4">
+          <button
+            onClick={handleLogout}
+            className="w-full py-2 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 transition-colors text-white rounded-lg font-semibold active:scale-95"
+          >
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
       </div>
     </div>
   );

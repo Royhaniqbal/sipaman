@@ -1,15 +1,27 @@
-import mongoose from "mongoose";
+import { Sequelize } from "sequelize";
+import dotenv from "dotenv";
 
-// const MONGO_URI = "mongodb://127.0.0.1:27017/booking_ruangan"; 
+dotenv.config();
 
-// 👉 ganti kalau pakai Mongo Atlas
+export const sequelize = new Sequelize(
+  process.env.DB_NAME || "booking_sipaman",
+  process.env.DB_USER || "root",
+  process.env.DB_PASS || "",
+  {
+    host: process.env.DB_HOST || "localhost",
+    dialect: "mysql",
+    logging: false, // Set ke console.log jika ingin melihat query SQL
+  }
+);
 
 export async function connectDB() {
   try {
-    await mongoose.connect(process.env.MONGO_URI || "");
-    console.log("✅ MongoDB connected");
+    await sequelize.authenticate();
+    // sync() akan membuat table otomatis jika belum ada
+    await sequelize.sync({ alter: true }); 
+    console.log("✅ MySQL (Sequelize) connected");
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
+    console.error("❌ MySQL connection error:", err);
     process.exit(1);
   }
 }

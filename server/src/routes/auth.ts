@@ -1,109 +1,162 @@
-// routes/auth.ts
-import { Router, Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import User from '../models/User'; // mongoose schema with TS types
+import express from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import User from "../models/User";
 
-const router = Router();
-const SECRET = process.env.JWT_SECRET || 'your_secret_key';
+const router = express.Router();
+const SECRET = process.env.JWT_SECRET || "your_secret_key";
 
-// Register
-router.post('/register', async (req: Request, res: Response) => {
+// ✅ REGISTER
+router.post("/register", async (req, res) => {
+  const { username, email, password, role, unitKerja } = req.body;
+
   try {
-    // console.log('Incoming register body:', req.body);
-    const { username, email, password, role } = req.body;
-
-    // Check if email already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email sudah digunakan' });
+    if (!unitKerja) {
+      return res.status(400).json({ message: "Unit Kerja wajib diisi" });
     }
 
-    // Hash password
-    const hashed = await bcrypt.hash(password, 10);
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) return res.status(400).json({ message: "Email sudah digunakan" });
 
-    // Save user with role (default to 'user' if not provided)
-    const user = await User.create({
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const newUser = await User.create({
       username,
       email,
-      password: hashed,
-      role: role && ['user', 'admin'].includes(role) ? role : 'user',
+      password: hashedPassword,
+      role: role || "user",
+      unitKerja, 
     });
 
-    // Generate token
-    const token = jwt.sign({ id: user._id, role: user.role }, SECRET, {
-      expiresIn: '1d',
-    });
+    // 🔹 Langkah 4: Pastikan Payload JWT Lengkap
+    const token = jwt.sign(
+      { 
+        id: newUser.id, 
+        username: newUser.username, 
+        unitKerja: newUser.unitKerja, // Sangat penting untuk Langkah 5 nanti
+        role: newUser.role 
+      }, 
+      SECRET, 
+      { expiresIn: "1d" }
+    );
 
-    res.status(201).json({ user, token });
+    res.json({ user: newUser, token });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error("Register Error:", err);
+    res.status(500).json({ message: "Gagal register" });
   }
 });
 
-// Login
-router.post('/login', async (req: Request, res: Response) => {
+// ✅ LOGIN
+router.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ message: 'User not found' });
+  try {
+    const user = await User.findOne({ where: { email } });
+    if (!user) return res.status(404).json({ message: "User tidak ditemukan" });
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(401).json({ message: 'Invalid password' });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Password salah" });
 
-  const token = jwt.sign({ id: user._id, role: user.role }, SECRET, { expiresIn: '1d' });
-  res.json({ token, user });
+    // 🔹 Langkah 4: Tambahkan info unitKerja di Payload JWT Login
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        username: user.username, 
+        unitKerja: user.unitKerja, // Data ini akan dibaca otomatis oleh Frontend
+        role: user.role 
+      }, 
+      SECRET, 
+      { expiresIn: "1d" }
+    );
+
+    res.json({ user, token });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
-// Get profile
-router.get('/me', async (req: Request, res: Response) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No token' });
+// ✅ GET ME (Ambil data user login secara real-time)
+router.get("/me", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
 
   try {
-    const decoded = jwt.verify(token, SECRET) as { id: string; role: string };
-    const user = await User.findById(decoded.id).select('-password'); // hide password
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const decoded = jwt.verify(token, SECRET) as { id: number };
+    
+    // Pastikan field unitKerja ikut terambil dari DB
+    const user = await User.findByPk(decoded.id, {
+      attributes: { exclude: ['password'] } 
+    });
 
+    if (!user) return res.status(404).json({ message: "User tidak ditemukan" });
+    
     res.json(user);
   } catch (err) {
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(401).json({ message: "Token tidak valid" });
   }
 });
-
-// Update profile
-router.patch('/me', async (req: Request, res: Response) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'No token' });
-
-    const decoded: any = jwt.verify(token, SECRET);
-
-    const updates: Partial<{ username: string; email: string; password: string }> = {
-      username: req.body.username,
-      email: req.body.email,
-    };
-
-    if (req.body.password) {
-      const hashed = await bcrypt.hash(req.body.password, 10);
-      updates.password = hashed;
-    }
-
-    const user = await User.findByIdAndUpdate(decoded.id, updates, { new: true });
-
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    res.json({
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
 
 export default router;
+// import express from "express";
+// import bcrypt from "bcryptjs";
+// import jwt from "jsonwebtoken";
+// import User from "../models/User";
+
+// const router = express.Router();
+// const SECRET = process.env.JWT_SECRET || "your_secret_key";
+
+// // ✅ REGISTER
+// router.post("/register", async (req, res) => {
+//   const { username, email, password, role } = req.body;
+//   try {
+//     // Cek apakah email sudah terdaftar
+//     const existingUser = await User.findOne({ where: { email } });
+//     if (existingUser) return res.status(400).json({ message: "Email sudah digunakan" });
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     const newUser = await User.create({
+//       username,
+//       email,
+//       password: hashedPassword,
+//       role,
+//     });
+
+//     const token = jwt.sign({ id: newUser.id }, SECRET, { expiresIn: "1d" });
+//     res.json({ user: newUser, token });
+//   } catch (err) {
+//     res.status(500).json({ message: "Gagal register" });
+//   }
+// });
+
+// // ✅ LOGIN
+// router.post("/login", async (req, res) => {
+//   const { email, password } = req.body;
+//   try {
+//     const user = await User.findOne({ where: { email } });
+//     if (!user) return res.status(404).json({ message: "User tidak ditemukan" });
+
+//     const isMatch = await bcrypt.compare(password, user.password);
+//     if (!isMatch) return res.status(400).json({ message: "Password salah" });
+
+//     const token = jwt.sign({ id: user.id }, SECRET, { expiresIn: "1d" });
+//     res.json({ user, token });
+//   } catch (err) {
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+// // ✅ GET ME (Ambil data user login)
+// router.get("/me", async (req, res) => {
+//   const token = req.headers.authorization?.split(" ")[1];
+//   if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+//   try {
+//     const decoded = jwt.verify(token, SECRET) as { id: number };
+//     const user = await User.findByPk(decoded.id);
+//     res.json(user);
+//   } catch (err) {
+//     res.status(401).json({ message: "Token tidak valid" });
+//   }
+// });
+
+// export default router;

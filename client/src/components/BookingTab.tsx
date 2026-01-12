@@ -21,20 +21,21 @@ export default function BookingTab({
   const [timeStart, setTimeStart] = useState<string>("");
   const [timeEnd, setTimeEnd] = useState<string>("");
   const [pic, setPic] = useState<string>("");
-
-  // 🔹 Tambahan: Unit Kerja
   const [unitKerja, setUnitKerja] = useState<string>("");
+  const [agenda, setAgenda] = useState<string>(""); // 🔹 State Baru untuk Agenda
+
+  // 🔹 Samakan daftar dengan Register agar sinkron
   const unitOptions = [
-    "Setditjen-URT",
-    "Setditjen-PEP",
-    "Setditjen-Keuangan",
-    "Setditjen-SDMA",
-    "Setditjen-PUUKS",
-    "Bina Stankom",
-    "Bina Intala",
+    "Setditjen Binalavotas - URT",
+    "Setditjen Binalavotas - Keuangan",
+    "Setditjen Binalavotas - PEP",
+    "Setditjen Binalavotas - SDMA",
     "Bina Lemlatvok",
-    "Bina Lavogan",
+    "Bina Stankomproglat",
+    "Bina Intala",
     "Bina Produktivitas",
+    "Bina Lavogan",
+    "Sekretariat BNSP",
   ];
 
   const rooms: { id: number; name: string; capacity: string; img: string }[] = [
@@ -46,13 +47,14 @@ export default function BookingTab({
   ];
 
   const bookingData = {
-    _id: editingBooking?._id || null,
+    id: editingBooking?.id || null,
     room: rooms.find((r) => r.id === selected)?.name || null,
     date: selectedDate || null,
     startTime: timeStart || null,
     endTime: timeEnd || null,
     pic: pic || null,
     unitKerja: unitKerja || null,
+    agenda: agenda || null, // 🔹 Tambahkan agenda ke data kirim
   };
 
   // Helpers time
@@ -66,7 +68,7 @@ export default function BookingTab({
     return `${hh}:${mm}`;
   };
 
-  // Ambil user (PIC)
+  // Ambil user (PIC & Unit Kerja)
   useEffect(() => {
     const fetchUser = async () => {
       const token = localStorage.getItem("token");
@@ -78,6 +80,7 @@ export default function BookingTab({
         if (res.ok) {
           const data = await res.json();
           if (data.username) setPic(data.username);
+          if (data.unitKerja) setUnitKerja(data.unitKerja);
         }
       } catch (err) {
         console.error("❌ Error fetch user:", err);
@@ -96,12 +99,11 @@ export default function BookingTab({
       setTimeEnd(editingBooking.endTime || "");
       setPic(editingBooking.pic || "");
       setUnitKerja(editingBooking.unitKerja || "");
+      setAgenda(editingBooking.agenda || ""); // 🔹 Set agenda saat edit
     }
   }, [editingBooking]);
 
-  // ----------------------
-  // Fetch availability
-  // ----------------------
+  // --- Fetch Availability Logic ---
   useEffect(() => {
     const fetchAvailability = async () => {
       if (bookingData.room && bookingData.date) {
@@ -111,187 +113,104 @@ export default function BookingTab({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ room: bookingData.room, date: bookingData.date }),
           });
-
-          if (!res.ok) {
-            setAvailability([]);
-            return;
-          }
-
+          if (!res.ok) { setAvailability([]); return; }
           let slots: AvailabilitySlot[] = [];
           const data = await res.json();
-          if (Array.isArray(data.available)) {
-            slots = data.available as AvailabilitySlot[];
-          }
+          if (Array.isArray(data.available)) slots = data.available as AvailabilitySlot[];
 
-          // 👉 kalau sedang edit, tambahkan slot lama user lalu gabungkan bila bersebelahan
           if (editingBooking && editingBooking.startTime && editingBooking.endTime) {
-            const oldSlot = {
-              startTime: editingBooking.startTime,
-              endTime: editingBooking.endTime,
-            };
-            slots.push(oldSlot);
-
-            // 🔹 Gabungkan slot lama dengan slot lain yang berdekatan
+            slots.push({ startTime: editingBooking.startTime, endTime: editingBooking.endTime });
             slots = slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
             const merged: AvailabilitySlot[] = [];
-
             for (const s of slots) {
-              if (!merged.length) {
-                merged.push(s);
-              } else {
+              if (!merged.length) merged.push(s);
+              else {
                 const last = merged[merged.length - 1];
-                if (last.endTime === s.startTime) {
-                  // Gabungkan slot menempel (contoh: 09:00–12:00 + 12:00–17:00)
-                  last.endTime = s.endTime;
-                } else {
-                  merged.push(s);
-                }
+                if (last.endTime === s.startTime) last.endTime = s.endTime;
+                else merged.push(s);
               }
             }
-
             slots = merged;
-            console.log("🧩 Final availability slots (merged):", slots);
           }
-
-          // Urutkan biar rapi
           slots.sort((a: AvailabilitySlot, b: AvailabilitySlot) => a.startTime.localeCompare(b.startTime));
           setAvailability(slots);
         } catch (err) {
           console.error("❌ Error fetch availability:", err);
           setAvailability([]);
         }
-      } else {
-        setAvailability([]);
-      }
+      } else { setAvailability([]); }
     };
-
     fetchAvailability();
   }, [bookingData.room, bookingData.date, editingBooking]);
 
-  // Generate opsi waktu
   const generateStartOptions = (): string[] => {
     if (!availability.length) return [];
     const options: string[] = [];
     availability.forEach((slot: AvailabilitySlot) => {
-      const start = parseToMinutes(slot.startTime);
+      let current = parseToMinutes(slot.startTime);
       const end = parseToMinutes(slot.endTime);
-      let current = start;
-      while (current < end) {
-        options.push(formatFromMinutes(current));
-        current += 30;
-      }
+      while (current < end) { options.push(formatFromMinutes(current)); current += 30; }
     });
     return Array.from(new Set(options)).sort();
   };
 
   const generateEndOptions = (): string[] => {
     if (!timeStart || !availability.length) return [];
-    const options: string[] = [];
     const startMin = parseToMinutes(timeStart);
-
-    const slot = availability.find((s: AvailabilitySlot) => {
-      const sStart = parseToMinutes(s.startTime);
-      const sEnd = parseToMinutes(s.endTime);
-      return startMin >= sStart && startMin < sEnd;
-    });
-
+    const slot = availability.find((s) => startMin >= parseToMinutes(s.startTime) && startMin < parseToMinutes(s.endTime));
     if (!slot) return [];
-    const slotEndMin = parseToMinutes(slot.endTime);
-
+    const options: string[] = [];
     let current = startMin + 30;
-    while (current <= slotEndMin) {
-      options.push(formatFromMinutes(current));
-      current += 30;
-    }
+    while (current <= parseToMinutes(slot.endTime)) { options.push(formatFromMinutes(current)); current += 30; }
     return options;
   };
 
-  // Reset otomatis
   useEffect(() => {
     const starts = generateStartOptions();
-    if (timeStart && !starts.includes(timeStart)) {
-      setTimeStart("");
-      setTimeEnd("");
-    }
+    if (timeStart && !starts.includes(timeStart)) { setTimeStart(""); setTimeEnd(""); }
   }, [availability]);
 
   useEffect(() => {
     if (!timeStart) return;
     const ends = generateEndOptions();
-    if (timeEnd && !ends.includes(timeEnd)) {
-      setTimeEnd("");
-    }
+    if (timeEnd && !ends.includes(timeEnd)) setTimeEnd("");
   }, [timeStart, availability]);
 
-  // Simpan / update booking
   const handleSubmit = async () => {
-    if (
-      !bookingData.room ||
-      !bookingData.date ||
-      !bookingData.startTime ||
-      !bookingData.endTime ||
-      !bookingData.pic ||
-      !bookingData.unitKerja
-    ) {
-      alert("⚠️ Mohon lengkapi semua data termasuk Unit Kerja!");
+    // 🔹 Tambahkan validasi agenda
+    if (!bookingData.room || !bookingData.date || !bookingData.startTime || !bookingData.endTime || !bookingData.pic || !bookingData.unitKerja || !bookingData.agenda) {
+      alert("⚠️ Mohon lengkapi semua data termasuk Agenda Kegiatan!");
       return;
     }
-
-    const startMinutes = parseToMinutes(bookingData.startTime);
-    const endMinutes = parseToMinutes(bookingData.endTime);
-    if (endMinutes <= startMinutes) {
+    if (parseToMinutes(bookingData.endTime) <= parseToMinutes(bookingData.startTime)) {
       alert("⚠️ Jam selesai harus lebih besar dari jam mulai!");
       return;
     }
-
     try {
-      const endpoint = editingBooking ? `${API}/api/book/${bookingData._id}` : `${API}/api/book`;
-      const method = editingBooking ? "PUT" : "POST";
-
+      const endpoint = editingBooking ? `${API}/api/book/${bookingData.id}` : `${API}/api/book`;
       const res = await fetch(endpoint, {
-        method,
+        method: editingBooking ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bookingData),
       });
-
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) {
-        throw new Error(data.message || "Gagal simpan booking");
-      }
-
-      const updatedBooking = {
-        _id: data._id || bookingData._id,
-        room: data.room || bookingData.room,
-        date: data.date || bookingData.date,
-        startTime: data.startTime || bookingData.startTime,
-        endTime: data.endTime || bookingData.endTime,
-        pic: data.pic || bookingData.pic,
-        unitKerja: data.unitKerja || bookingData.unitKerja,
-      };
-
+      if (!res.ok || data?.success === false) throw new Error(data.message || "Gagal simpan booking");
+      
+      const updatedBooking = { ...bookingData, id: data.id || bookingData.id };
       if (editingBooking && onFinishEdit) {
         onFinishEdit(updatedBooking);
         alert("✅ Booking berhasil diperbarui!");
       } else {
         setHistory((prev) => [...prev, updatedBooking]);
         alert("✅ Booking baru berhasil disimpan!");
-        setSelected(null);
-        setSelectedDate("");
-        setTimeStart("");
-        setTimeEnd("");
-        setUnitKerja("");
+        // 🔹 Reset form termasuk agenda
+        setSelected(null); setSelectedDate(""); setTimeStart(""); setTimeEnd(""); setAgenda("");
       }
     } catch (err: any) {
-      console.error("Submit error:", err);
-      toast.error(`❌ Error: ${err.message || ""}`, {
-        style: { background: "#fee2e2", color: "#b91c1c", fontWeight: "600" },
-      });
+      toast.error(`❌ Error: ${err.message || ""}`, { style: { background: "#fee2e2", color: "#b91c1c", fontWeight: "600" } });
     }
   };
 
-  // ----------------------
-  // JSX
-  // ----------------------
   const startOptions = generateStartOptions();
   const endOptions = generateEndOptions();
 
@@ -301,166 +220,74 @@ export default function BookingTab({
         {/* Ruangan */}
         <div className="flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {rooms.map((room) => {
-            const isDisabled = room.id === 3; // 🔥 Nonaktifkan Command Center
-
-            return (
-              <div
-                key={room.id}
-                className={`w-full bg-transparent border-2 rounded-xl flex flex-col justify-between items-center p-3 transition
-                  ${
-                    selected === room.id && !isDisabled
-                      ? "border-blue-500 shadow-xl"
-                      : "border-gray-300 shadow-sm"
-                  }
-                  ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}
-                `}
-              >
-                <div className="flex flex-col items-center">
-                  <img
-                    src={room.img}
-                    alt={room.name}
-                    className="w-full h-40 object-cover mb-2 rounded-lg"
-                  />
-                  <p className="text-base text-center">{room.name}</p>
-                  <p className="text-sm text-center font-normal mt-0.5">
-                    (Kapasitas {room.capacity})
-                  </p>
-
-                  {isDisabled && (
-                    <p className="text-xs text-red-500 mt-1 font-semibold">
-                      Tidak tersedia
-                    </p>
-                  )}
+            {rooms.map((room) => {
+              const isDisabled = room.id === 3;
+              return (
+                <div key={room.id} className={`w-full border-2 rounded-xl flex flex-col justify-between items-center p-3 transition ${selected === room.id && !isDisabled ? "border-blue-500 shadow-xl" : "border-gray-300 shadow-sm"} ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}>
+                  <div className="flex flex-col items-center">
+                    <img src={room.img} alt={room.name} className="w-full h-40 object-cover mb-2 rounded-lg" />
+                    <p className="text-base text-center">{room.name}</p>
+                    <p className="text-sm text-center font-normal mt-0.5">(Kapasitas {room.capacity})</p>
+                    {isDisabled && <p className="text-xs text-red-500 mt-1 font-semibold">Tidak tersedia</p>}
+                  </div>
+                  <button disabled={isDisabled} onClick={() => !isDisabled && setSelected(room.id)} className={`px-4 py-1 rounded-lg mt-3 text-white transition ${isDisabled ? "bg-gray-400" : selected === room.id ? "bg-blue-700" : "bg-blue-300 hover:bg-blue-700"}`}>
+                    {isDisabled ? "Tidak Bisa Dipilih" : "Pilih"}
+                  </button>
                 </div>
-
-                <button
-                  disabled={isDisabled}
-                  onClick={() => !isDisabled && setSelected(room.id)}
-                  className={`px-4 py-1 rounded-lg mt-3 text-white transition
-                    ${
-                      isDisabled
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : selected === room.id
-                        ? "bg-blue-700"
-                        : "bg-blue-300 hover:bg-blue-700"
-                    }
-                  `}
-                >
-                  {isDisabled ? "Tidak Bisa Dipilih" : "Pilih"}
-                </button>
-              </div>
-            );
-          })}
-
+              );
+            })}
           </div>
         </div>
 
         {/* Form */}
         <div className="w-full lg:w-[350px] p-4 border rounded-lg shadow-md bg-white h-fit lg:ml-auto">
           <div className="mb-4">
-            <label className="block text-sm mb-1">Tanggal Pemakaian</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 font-normal bg-white"
-            />
+            <label className="block text-sm mb-1 font-bold">Tanggal Pemakaian</label>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 font-normal bg-white" />
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm mb-1">Jam Kosong Ruangan</label>
+            <label className="block text-sm mb-1 font-bold">Jam Kosong Ruangan</label>
             <div className="w-full border rounded-lg px-3 py-2 bg-gray-100 text-gray-700 font-normal min-h-[50px]">
               {availability.length > 0 ? (
                 <ul className="list-disc list-inside text-sm">
-                  {availability.map((slot: AvailabilitySlot, idx: number) => (
-                    <li key={idx}>
-                      {slot.startTime} - {slot.endTime}
-                    </li>
-                  ))}
+                  {availability.map((slot, idx) => <li key={idx}>{slot.startTime} - {slot.endTime}</li>)}
                 </ul>
-              ) : (
-                <span className="text-gray-500 text-sm">
-                  {bookingData.room && bookingData.date ? "Tidak ada slot kosong" : "(Pilih ruangan & tanggal dulu)"}
-                </span>
-              )}
+              ) : <span className="text-gray-500 text-sm">{bookingData.room && bookingData.date ? "Tidak ada slot kosong" : "(Pilih ruangan & tanggal dulu)"}</span>}
             </div>
           </div>
 
-          {/* Waktu */}
           <div className="mb-4">
-            <label className="block text-sm mb-1">Waktu Pemakaian</label>
+            <label className="block text-sm mb-1 font-bold">Waktu Pemakaian</label>
             <div className="flex items-center gap-2">
-              <select
-                value={timeStart}
-                onChange={(e) => {
-                  setTimeStart(e.target.value);
-                  setTimeEnd("");
-                }}
-                className="w-1/2 border rounded-lg px-3 py-2 font-normal bg-white"
-              >
+              <select value={timeStart} onChange={(e) => { setTimeStart(e.target.value); setTimeEnd(""); }} className="w-1/2 border rounded-lg px-3 py-2 font-normal bg-white">
                 <option value="">Pilih</option>
-                {startOptions.map((t: string) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
+                {startOptions.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
               <span>-</span>
-              <select
-                value={timeEnd}
-                onChange={(e) => setTimeEnd(e.target.value)}
-                className="w-1/2 border rounded-lg px-3 py-2 font-normal bg-white"
-                disabled={!timeStart || endOptions.length === 0}
-              >
+              <select value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} className="w-1/2 border rounded-lg px-3 py-2 font-normal bg-white" disabled={!timeStart || endOptions.length === 0}>
                 <option value="">Pilih</option>
-                {endOptions.map((t: string) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
+                {endOptions.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
           </div>
 
-          {/* PIC */}
+          {/* 🔹 Input Agenda Kegiatan */}
           <div className="mb-4">
-            <label className="block text-sm mb-1">PIC</label>
-            <input
-              type="text"
-              value={pic}
-              readOnly
-              className="w-full border rounded-lg px-3 py-2 font-normal bg-gray-100 text-gray-700"
+            <label className="block text-sm mb-1 font-bold">Agenda Kegiatan</label>
+            <textarea
+              value={agenda}
+              onChange={(e) => setAgenda(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 font-normal bg-white h-24 resize-none"
+              placeholder="Contoh: Rapat Koordinasi internal..."
             />
           </div>
 
-          {/* ✅ Unit Kerja */}
-          <div className="mb-4">
-            <label className="block text-sm mb-1">Unit Kerja</label>
-            <select
-              value={unitKerja}
-              onChange={(e) => setUnitKerja(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 font-normal bg-white"
-            >
-              <option value="">Pilih Unit Kerja</option>
-              {unitOptions.map((unit) => (
-                <option key={unit} value={unit}>
-                  {unit}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            onClick={handleSubmit}
-            className="w-full py-3 rounded-full bg-blue-300 hover:bg-blue-700 text-white font-semibold"
-          >
+          <button onClick={handleSubmit} className="w-full py-3 rounded-full bg-blue-300 hover:bg-blue-700 text-white font-semibold transition active:scale-95">
             {editingBooking ? "Simpan Perubahan" : "Kirim Pengajuan"}
           </button>
 
-          <div className="mt-4">
-            <Toaster position="top-center" reverseOrder={false} gutter={8} />
-          </div>
+          <div className="mt-4"><Toaster position="top-center" /></div>
         </div>
       </div>
     </div>

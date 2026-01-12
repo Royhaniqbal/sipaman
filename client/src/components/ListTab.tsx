@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import BookingTab from "./BookingTab";
 
 type BookingData = {
-  _id?: string;
+  id?: number;
   room: string | null;
   date: string | null;
   startTime: string | null;
   endTime: string | null;
   pic: string | null;
+  unitKerja?: string | null;
 };
 
 type ListTabProps = {
@@ -92,7 +93,7 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
   // ✅ Dipanggil setelah berhasil edit
   const handleBookingUpdated = (updated: BookingData) => {
     setHistory((prev) =>
-      prev.map((b) => (b._id === updated._id ? updated : b))
+      prev.map((b) => (b.id === updated.id ? updated : b))
     );
     setEditingBooking(null); // tutup modal
   };

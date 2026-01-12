@@ -1,42 +1,40 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
+import { DataTypes, Model } from "sequelize";
+import { sequelize } from "../db";
 
-export interface IBooking {
-  room: string;
-  date: string;      // format YYYY-MM-DD
-  startTime: string; // format HH:mm
-  endTime: string;   // format HH:mm
-  pic: string;
-  unitKerja: string; // ✅ tambahan field baru
-  createdAt?: Date;
-  updatedAt?: Date;
+class Booking extends Model {
+  public id!: number;
+  public room!: string;
+  public date!: string;
+  public startTime!: string;
+  public endTime!: string;
+  public pic!: string;
+  public unitKerja!: string;
 }
 
-// Gunakan type Document terpisah (jangan extend)
-export type BookingDocument = Document & IBooking;
-
-const BookingSchema = new Schema<BookingDocument>(
+Booking.init(
   {
-    room: { type: String, required: true, trim: true },
-    date: { type: String, required: true },
-    startTime: { type: String, required: true },
-    endTime: { type: String, required: true },
-    pic: { type: String, required: true, trim: true },
-    unitKerja: { type: String, required: true, trim: true },
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    room: { type: DataTypes.STRING, allowNull: false },
+    date: { type: DataTypes.STRING, allowNull: false },
+    startTime: { type: DataTypes.STRING, allowNull: false },
+    endTime: { type: DataTypes.STRING, allowNull: false },
+    pic: { type: DataTypes.STRING, allowNull: false },
+    unitKerja: { type: DataTypes.STRING, allowNull: false },
+    agenda: { 
+      type: DataTypes.TEXT, // Menggunakan TEXT agar bisa menampung input yang panjang
+      allowNull: false 
+    },
   },
-  { timestamps: true }
+  {
+    sequelize,
+    modelName: "Booking",
+    tableName: "bookings",
+    timestamps: false, // ✅ Mematikan createdAt & updatedAt
+  }
 );
 
-// Index dan validasi
-BookingSchema.index({ room: 1, date: 1 });
-BookingSchema.index({ room: 1, date: 1, startTime: 1, endTime: 1 }, { unique: true });
-
-BookingSchema.pre("save", function (next) {
-  const booking = this as BookingDocument;
-  if (booking.startTime >= booking.endTime) {
-    return next(new Error("End time harus lebih besar dari start time"));
-  }
-  next();
-});
-
-// Export model
-export default mongoose.model<BookingDocument>("Booking", BookingSchema);
+export default Booking;
