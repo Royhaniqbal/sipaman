@@ -9,6 +9,7 @@ type BookingData = {
   endTime: string | null;
   pic: string | null;
   unitKerja?: string | null;
+  agenda?: string | null;
 };
 
 type ListTabProps = {
@@ -125,6 +126,14 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
               <p className="text-sm font-semibold">PIC</p>
               <p className="text-sm">:</p>
               <p className="text-sm">{item.pic}</p>
+
+              <p className="text-sm font-semibold">Unit Kerja</p>
+              <p className="text-sm">:</p>
+              <p className="text-sm">{item.unitKerja || "-"}</p>
+
+              <p className="text-sm font-semibold">Agenda</p>
+              <p className="text-sm">:</p>
+              <p className="text-sm">{item.agenda || "-"}</p>
             </div>
 
             {/* Tombol Aksi */}

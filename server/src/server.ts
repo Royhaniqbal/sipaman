@@ -62,19 +62,17 @@ app.post("/api/check-availability", async (req: Request, res: Response) => {
 // ✅ Endpoint: Buat booking baru
 // ✅ Endpoint: Buat booking baru
 app.post("/api/book", async (req: Request, res: Response) => {
-  // 🔹 Tambahkan agenda ke destructuring body
   const { room, date, startTime, endTime, pic, unitKerja, agenda } = req.body;
 
-  // 🔹 Tambahkan agenda ke validasi field wajib
   if (!room || !date || !startTime || !endTime || !pic || !unitKerja || !agenda) {
     return res.status(400).json({ success: false, message: "Data tidak lengkap" });
   }
 
   try {
+    // 1. Cek Konflik
     const conflict = await Booking.findOne({
       where: {
-        room,
-        date,
+        room, date,
         startTime: { [Op.lt]: endTime },
         endTime: { [Op.gt]: startTime },
       },
@@ -84,18 +82,25 @@ app.post("/api/book", async (req: Request, res: Response) => {
       return res.status(409).json({ success: false, message: "⚠️ Ruangan sudah dibooking" });
     }
 
-    // 🔹 Simpan ke MySQL (termasuk agenda)
+    // 2. Simpan ke Database (Wajib Berhasil)
     const newBooking = await Booking.create({ room, date, startTime, endTime, pic, unitKerja, agenda });
 
-    // 🔹 Sinkron Sheets (termasuk agenda)
-    await appendBookingToSheet({ room, date, startTime, endTime, pic, unitKerja, agenda });
+    // 3. Sinkron Sheets & WA secara Independen (Jangan pakai 'await' yang menggandeng keduanya)
+    // Kita jalankan tanpa await di depan fungsi agar jika satu gagal, respon API tetap sukses
     
-    // 🔹 Tambahkan agenda ke pesan WA
-    const msg = `📢 Booking Baru!\n🏢 ${room}\n📅 ${date}\n⏰ ${startTime} - ${endTime}\n📝 Agenda: ${agenda}\n👤 ${pic}\n🏬 Unit Kerja: ${unitKerja}`;
-    await sendWhatsAppMessage("6281335382726", msg);
+    appendBookingToSheet({ room, date, startTime, endTime, pic, unitKerja, agenda })
+      .catch(err => console.error("❌ Gagal Sinkron Sheets:", err.message));
 
+    const msg = `📢 Booking Baru!\n🏢 ${room}\n📅 ${date}\n⏰ ${startTime} - ${endTime}\n📝 Agenda: ${agenda}\n👤 ${pic}\n🏬 Unit Kerja: ${unitKerja}`;
+    
+    sendWhatsAppMessage("6281335382726", msg)
+      .catch(err => console.error("❌ Gagal Kirim WA:", err.message));
+
+    // Kirim respon sukses ke frontend karena data sudah masuk DB
     res.json({ success: true, message: "Booking berhasil dibuat", ...newBooking.get({ plain: true }) });
+
   } catch (error) {
+    console.error("❌ Error Database:", error);
     res.status(500).json({ success: false, message: "Gagal simpan booking" });
   }
 });
@@ -103,7 +108,6 @@ app.post("/api/book", async (req: Request, res: Response) => {
 // ✅ Endpoint: Update booking
 app.put("/api/book/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
-  // 🔹 Tambahkan agenda ke destructuring body
   const { room, date, startTime, endTime, pic, unitKerja, agenda } = req.body;
 
   try {
@@ -124,14 +128,12 @@ app.put("/api/book/:id", async (req: Request, res: Response) => {
 
     const oldData = { ...booking.get({ plain: true }) };
 
-    // 🔹 Update ke MySQL (termasuk agenda)
     await booking.update({ room, date, startTime, endTime, pic, unitKerja, agenda });
 
-    // 🔹 Sync Sheets (termasuk agenda)
     await deleteBookingFromSheet(oldData);
     await appendBookingToSheet({ room, date, startTime, endTime, pic, unitKerja, agenda });
 
-    // 🔹 Tambahkan agenda ke pesan WA update
+    // 🔹 Pesan WA Update (Agenda sudah masuk di sini)
     const msg = `🔄 UPDATE BOOKING!\n🏢 ${room}\n📅 ${date}\n⏰ ${startTime} - ${endTime}\n📝 Agenda: ${agenda}\n👤 ${pic}\n🏬 Unit Kerja: ${unitKerja}\n\nStatus: Diperbarui oleh user.`;
     
     await sendWhatsAppMessage("6281335382726", msg);
@@ -143,7 +145,7 @@ app.put("/api/book/:id", async (req: Request, res: Response) => {
   }
 });
 
-// ✅ Endpoint: Batalkan booking (DIPERBARUI)
+// ✅ Endpoint: Cancel booking
 app.post("/api/cancel-booking", async (req: Request, res: Response) => {
   const { id } = req.body; 
 
@@ -151,18 +153,15 @@ app.post("/api/cancel-booking", async (req: Request, res: Response) => {
     const booking = await Booking.findByPk(id);
     if (!booking) return res.status(404).json({ success: false, message: "Tidak ditemukan" });
 
-    // Simpan data ke variabel sebelum dihapus untuk isi pesan WA
     const dataToDelete = { ...booking.get({ plain: true }) };
     
-    // 🔹 Hapus dari MySQL
     await booking.destroy(); 
 
-    // ✅ Kirim Notifikasi Pembatalan via WA
-    const msg = `❌ PEMBATALAN BOOKING!\n🏢 ${dataToDelete.room}\n📅 ${dataToDelete.date}\n⏰ ${dataToDelete.startTime} - ${dataToDelete.endTime}\n👤 ${dataToDelete.pic}\n🏬 ${dataToDelete.unitKerja}\n\nStatus: Dibatalkan oleh user.`;
+    // ✅ Pesan WA Pembatalan (Ditambahkan baris Agenda)
+    const msg = `❌ PEMBATALAN BOOKING!\n🏢 ${dataToDelete.room}\n📅 ${dataToDelete.date}\n⏰ ${dataToDelete.startTime} - ${dataToDelete.endTime}\n📝 Agenda: ${dataToDelete.agenda}\n👤 ${dataToDelete.pic}\n🏬 Unit Kerja: ${dataToDelete.unitKerja}\n\nStatus: Dibatalkan oleh user.`;
     
-    await sendWhatsAppMessage("6281335382726", msg); // Pastikan nomor tujuan benar
+    await sendWhatsAppMessage("6281335382726", msg);
 
-    // Hapus dari Google Sheets
     await deleteBookingFromSheet(dataToDelete);
 
     res.json({ success: true, message: "Booking berhasil dibatalkan dan notifikasi terkirim" });

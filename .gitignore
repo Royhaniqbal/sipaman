@@ -1,2 +1,1 @@
-# Ignore credentials
-server/google-credentials.json
+server/config/google-credentials.json
