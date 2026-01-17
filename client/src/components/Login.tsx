@@ -7,9 +7,10 @@ const API = import.meta.env.VITE_API_BASE_URL;
 interface LoginProps {
   onLogin: (user: any, token: string) => void;
   onSwitchToRegister: () => void;
+  nForgotPassword: () => void;
 }
 
-export default function Login({ onLogin, onSwitchToRegister }: LoginProps) {
+export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -119,6 +120,16 @@ export default function Login({ onLogin, onSwitchToRegister }: LoginProps) {
                   className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700 bg-white p-1 rounded-full shadow-sm"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+
+              <div className="w-7/12 text-right !-mt-1 pr-4">
+                <button 
+                  type="button"
+                  onClick={onForgotPassword}
+                  className="bg-transparent border-none p-0 text-xs text-white hover:underline opacity-80 hover:opacity-100 transition-opacity"
+                >
+                  Lupa password?
                 </button>
               </div>
 

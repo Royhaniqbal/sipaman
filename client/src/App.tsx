@@ -5,6 +5,7 @@ import ListTab from './components/ListTab';
 import ManageTab from './components/ManageTab';
 import Login from "./components/Login";
 import Register from "./components/Register";
+import ForgotPassword from "./components/ForgotPassword";
 
 import {
   CalendarCheck,
@@ -22,7 +23,8 @@ function App() {
   const [tab, setTab] = useState('book');
   const [history, setHistory] = useState<any[]>([]); 
   const [user, setUser] = useState<User | null>(null);
-  const [authPage, setAuthPage] = useState<"login" | "register">("login");
+  //const [authPage, setAuthPage] = useState<"login" | "register">("login"); //code lama
+  const [authPage, setAuthPage] = useState<"login" | "register" | "forgot-password">("login");
 
   const renderTab = () => {
     switch (tab) {
@@ -38,16 +40,18 @@ function App() {
   };
 
   if (!user) {
-    return authPage === "login" ? (
-      <Login
-        onLogin={(u) => setUser(u)}
-        onSwitchToRegister={() => setAuthPage("register")}
+    if (authPage === "login") return (
+      <Login 
+        onLogin={(u) => setUser(u)} 
+        onSwitchToRegister={() => setAuthPage("register")} 
+        onForgotPassword={() => setAuthPage("forgot-password")} // Prop baru
       />
-    ) : (
-      <Register
-        onRegister={(u) => setUser(u)}
-        onSwitchToLogin={() => setAuthPage("login")}
-      />
+    );
+    if (authPage === "register") return (
+      <Register onRegister={(u) => setUser(u)} onSwitchToLogin={() => setAuthPage("login")} />
+    );
+    if (authPage === "forgot-password") return (
+      <ForgotPassword onBackToLogin={() => setAuthPage("login")} />
     );
   }
 
