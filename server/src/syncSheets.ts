@@ -14,9 +14,8 @@ if (!credentialsPath) {
 const raw = fs.readFileSync(credentialsPath, "utf8");
 const CREDENTIALS = JSON.parse(raw);
 
-// ✅ METODE TERSTABIL: 
 // Menggunakan GoogleAuth dengan parsing private_key yang sangat ketat.
-// ✅ Gunakan String.raw untuk memastikan tidak ada interpretasi karakter miring yang salah
+// Gunakan String.raw untuk memastikan tidak ada interpretasi karakter miring yang salah
 const formattedKey = CREDENTIALS.private_key
   .replace(/\\n/g, '\n') // Mengubah teks literal \n menjadi baris baru
   .trim();

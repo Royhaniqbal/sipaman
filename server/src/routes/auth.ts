@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User";
+import Booking from "../models/Booking";
 import nodemailer from "nodemailer";
 
 const router = express.Router();
@@ -102,6 +103,57 @@ router.get("/me", async (req, res) => {
     res.json(user);
   } catch (err) {
     res.status(401).json({ message: "Token tidak valid" });
+  }
+});
+
+// ✅ UPDATE PROFILE (Bagian yang diubah)
+// ✅ UPDATE PROFILE (Dengan Sinkronisasi Riwayat)
+router.put("/update-profile", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    const decoded = jwt.verify(token, SECRET) as { id: number };
+    const { username, email, unitKerja } = req.body;
+
+    const user = await User.findByPk(decoded.id);
+    if (!user) return res.status(404).json({ message: "User tidak ditemukan" });
+
+    const oldUsername = user.username; // Simpan username lama
+
+    // 1. Update data user
+    await user.update({ username, email, unitKerja });
+
+    // 2. 🔹 UPDATE RIWAYAT (Sangat Penting)
+    // Jika username berubah, update semua kolom 'pic' di tabel Booking yang namanya sama
+    if (username !== oldUsername) {
+      await Booking.update(
+        { pic: username }, // Nama baru
+        { where: { pic: oldUsername } } // Di semua booking milik nama lama
+      );
+    }
+
+    res.json({ message: "Profil dan riwayat berhasil diperbarui", user: { username, email, unitKerja } });
+  } catch (err) {
+    res.status(500).json({ message: "Gagal memperbarui profil" });
+  }
+});
+
+// ✅ DELETE ACCOUNT
+router.delete("/delete-account", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    const decoded = jwt.verify(token, SECRET) as { id: number };
+    const user = await User.findByPk(decoded.id);
+
+    if (!user) return res.status(404).json({ message: "User tidak ditemukan" });
+
+    await user.destroy();
+    res.json({ message: "Akun berhasil dihapus" });
+  } catch (err) {
+    res.status(500).json({ message: "Gagal menghapus akun" });
   }
 });
 
