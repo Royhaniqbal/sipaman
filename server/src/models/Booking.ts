@@ -9,6 +9,7 @@ class Booking extends Model {
   public endTime!: string;
   public pic!: string;
   public unitKerja!: string;
+  public agenda!: string;
 }
 
 Booking.init(

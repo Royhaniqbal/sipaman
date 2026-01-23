@@ -27,36 +27,53 @@ connectDB();
 
 app.use("/api/auth", authRoutes);
 
-// ✅ Endpoint: Cek ketersediaan
+// ✅ Endpoint: Cek ketersediaan & Ambil Detail Peminjam
 app.post("/api/check-availability", async (req: Request, res: Response) => {
   const { room, date } = req.body;
   if (!room || !date) {
     return res.status(400).json({ error: "Room dan date wajib diisi" });
   }
 
-  // 🔹 Query MySQL: Menggunakan findAll & where
-  const roomBookings = await Booking.findAll({ where: { room, date } });
-  
-  const WORKING_HOURS = [{ startTime: "07:30", endTime: "17:00" }];
-  let availableSlots = [...WORKING_HOURS];
-
-  roomBookings.forEach((booked: any) => {
-    availableSlots = availableSlots.flatMap((slot) => {
-      if (booked.startTime >= slot.endTime || booked.endTime <= slot.startTime) {
-        return [slot];
-      }
-      const result: { startTime: string; endTime: string }[] = [];
-      if (booked.startTime > slot.startTime) {
-        result.push({ startTime: slot.startTime, endTime: booked.startTime });
-      }
-      if (booked.endTime < slot.endTime) {
-        result.push({ startTime: booked.endTime, endTime: slot.endTime });
-      }
-      return result;
+  try {
+    // 1. Ambil semua data booking untuk ruangan dan tanggal tersebut
+    const roomBookings = await Booking.findAll({ 
+      where: { room, date },
+      order: [['startTime', 'ASC']] 
     });
-  });
+    
+    // 2. Tentukan jam kerja operasional
+    const WORKING_HOURS = [{ startTime: "07:30", endTime: "17:00" }];
+    let availableSlots = [...WORKING_HOURS];
 
-  res.json({ room, date, available: availableSlots });
+    // 3. Algoritma menghitung slot kosong
+    roomBookings.forEach((booked: any) => {
+      availableSlots = availableSlots.flatMap((slot) => {
+        if (booked.startTime >= slot.endTime || booked.endTime <= slot.startTime) {
+          return [slot];
+        }
+        const result: { startTime: string; endTime: string }[] = [];
+        if (booked.startTime > slot.startTime) {
+          result.push({ startTime: slot.startTime, endTime: booked.startTime });
+        }
+        if (booked.endTime < slot.endTime) {
+          result.push({ startTime: booked.endTime, endTime: slot.endTime });
+        }
+        return result;
+      });
+    });
+
+    // 4. Kirim respon tunggal yang berisi slot kosong DAN daftar peminjam
+    return res.json({ 
+      room, 
+      date, 
+      available: availableSlots, 
+      booked: roomBookings // Data ini yang akan tampil di tabel pop-up Frontend
+    });
+
+  } catch (error) {
+    console.error("❌ Error check-availability:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ✅ Endpoint: Buat booking baru

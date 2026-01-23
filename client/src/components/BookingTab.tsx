@@ -1,8 +1,10 @@
 // src/components/BookingTab.tsx
 import { useState, useEffect } from "react";
 import toast, { Toaster } from "react-hot-toast";
+import { Info, X } from "lucide-react";
 
 type AvailabilitySlot = { startTime: string; endTime: string };
+type BookingDetail = { startTime: string; endTime: string; pic: string; unitKerja: string; agenda: string };
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -23,6 +25,11 @@ export default function BookingTab({
   const [pic, setPic] = useState<string>("");
   const [unitKerja, setUnitKerja] = useState<string>("");
   const [agenda, setAgenda] = useState<string>(""); // 🔹 State Baru untuk Agenda
+
+  // 🔹 State Baru untuk Modal Detail
+  const [showModal, setShowModal] = useState(false);
+  const [details, setDetails] = useState<BookingDetail[]>([]);
+  const [modalRoomName, setModalRoomName] = useState("");
 
   // 🔹 Samakan daftar dengan Register agar sinkron
   const unitOptions = [
@@ -45,6 +52,30 @@ export default function BookingTab({
     { id: 4, name: "Ruang Rapat Lt2", capacity: "16 orang", img: "/gambarlima.jpg" },
     { id: 5, name: "Ballroom", capacity: "400 orang", img: "/gambarenam.jpg" },
   ];
+
+  // 🔹 Fungsi Baru: Ambil detail pendaftar dari backend
+  const handleShowInfo = async (roomName: string) => {
+    if (!selectedDate) {
+      toast.error("⚠️ Silakan pilih tanggal terlebih dahulu di form!");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/api/check-availability`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room: roomName, date: selectedDate }),
+      });
+      const data = await res.json();
+      
+      // Mengambil properti 'booked' yang berisi daftar peminjam (pastikan backend mengirim ini)
+      setDetails(data.booked || []); 
+      setModalRoomName(roomName);
+      setShowModal(true);
+    } catch (err) {
+      toast.error("Gagal memuat detail data");
+    }
+  };
 
   const bookingData = {
     id: editingBooking?.id || null,
@@ -224,13 +255,33 @@ export default function BookingTab({
               const isDisabled = room.id === 3;
               return (
                 <div key={room.id} className={`w-full border-2 rounded-xl flex flex-col justify-between items-center p-3 transition ${selected === room.id && !isDisabled ? "border-blue-500 shadow-xl" : "border-gray-300 shadow-sm"} ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}>
-                  <div className="flex flex-col items-center">
-                    <img src={room.img} alt={room.name} className="w-full h-40 object-cover mb-2 rounded-lg" />
+                  
+                  {/* 1. Gambar Ruangan (Tanpa Relative) */}
+                  <img src={room.img} alt={room.name} className="w-full h-40 object-cover mb-2 rounded-lg" />
+                  
+                  {/* 2. Nama Ruangan & Tombol Info (Sejajar/Flex) */}
+                  <div className="flex items-center justify-center gap-2 w-full">
                     <p className="text-base text-center">{room.name}</p>
-                    <p className="text-sm text-center font-normal mt-0.5">(Kapasitas {room.capacity})</p>
-                    {isDisabled && <p className="text-xs text-red-500 mt-1 font-semibold">Tidak tersedia</p>}
+                    <button 
+                      onClick={() => handleShowInfo(room.name)}
+                      className="bg-white text-blue-600 hover:text-blue-800 transition-all p-1.5 rounded-full shadow-sm border border-gray-100 hover:shadow-md active:scale-90"
+                      title="Lihat Detail Peminjam"
+                    >
+                      <Info size={18} />
+                    </button>
                   </div>
-                  <button disabled={isDisabled} onClick={() => !isDisabled && setSelected(room.id)} className={`px-4 py-1 rounded-lg mt-3 text-white transition ${isDisabled ? "bg-gray-400" : selected === room.id ? "bg-blue-700" : "bg-blue-300 hover:bg-blue-700"}`}>
+
+                  {/* 3. Kapasitas */}
+                  <p className="text-sm text-center font-normal mt-0.5">(Kapasitas {room.capacity})</p>
+                  
+                  {isDisabled && <p className="text-xs text-red-500 mt-1 font-semibold">Tidak tersedia</p>}
+
+                  {/* 4. Tombol Pilih */}
+                  <button 
+                    disabled={isDisabled} 
+                    onClick={() => !isDisabled && setSelected(room.id)} 
+                    className={`w-full py-1 rounded-lg mt-3 text-white transition ${isDisabled ? "bg-gray-400" : selected === room.id ? "bg-blue-700" : "bg-blue-300 hover:bg-blue-700"}`}
+                  >
                     {isDisabled ? "Tidak Bisa Dipilih" : "Pilih"}
                   </button>
                 </div>
@@ -290,6 +341,61 @@ export default function BookingTab({
           <div className="mt-4"><Toaster position="top-center" /></div>
         </div>
       </div>
+      {/* 🔹 MODAL POP UP TABEL DETAIL PEMINJAM */}
+      {showModal && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-4 border-b flex justify-between items-center bg-blue-50 rounded-t-2xl">
+              <div>
+                <h3 className="text-lg font-bold text-blue-900">Daftar Peminjam: {modalRoomName}</h3>
+                <p className="text-xs font-normal text-gray-600">Tanggal: {selectedDate}</p>
+              </div>
+              <button 
+                onClick={() => setShowModal(false)} 
+                className="bg-transparent text-blue-900 hover:text-red-500 transition-colors p-1">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-auto">
+              {details.length > 0 ? (
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full text-left text-sm font-normal">
+                    <thead className="bg-gray-100 font-bold border-b text-gray-700">
+                      <tr>
+                        <th className="p-3">Waktu</th>
+                        <th className="p-3">PIC</th>
+                        <th className="p-3">Unit Kerja</th>
+                        <th className="p-3">Agenda</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {details.map((d, i) => (
+                        <tr key={i} className="hover:bg-gray-50 transition-colors">
+                          <td className="p-3 whitespace-nowrap">{d.startTime} - {d.endTime}</td>
+                          <td className="p-3">{d.pic}</td>
+                          <td className="p-3">{d.unitKerja}</td>
+                          <td className="p-3 italic text-gray-600">{d.agenda}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-400 font-normal">
+                  Belum ada peminjaman pada tanggal ini.
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t text-right">
+              <button onClick={() => setShowModal(false)} className="px-6 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition shadow-md">
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
