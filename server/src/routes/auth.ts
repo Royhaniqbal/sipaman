@@ -106,8 +106,7 @@ router.get("/me", async (req, res) => {
   }
 });
 
-// ✅ UPDATE PROFILE (Bagian yang diubah)
-// ✅ UPDATE PROFILE (Dengan Sinkronisasi Riwayat)
+// ✅ UPDATE PROFILE
 router.put("/update-profile", async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Unauthorized" });
@@ -121,11 +120,10 @@ router.put("/update-profile", async (req, res) => {
 
     const oldUsername = user.username; // Simpan username lama
 
-    // 1. Update data user
+    // Update data user
     await user.update({ username, email, unitKerja });
 
-    // 2. 🔹 UPDATE RIWAYAT (Sangat Penting)
-    // Jika username berubah, update semua kolom 'pic' di tabel Booking yang namanya sama
+    // Update Riwayat
     if (username !== oldUsername) {
       await Booking.update(
         { pic: username }, // Nama baru
