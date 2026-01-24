@@ -127,6 +127,15 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
                 required
               />
 
+              {/* 🔹 Dropdown Role Desktop */}
+              <div className="relative w-8/12">
+                <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-5 py-2 rounded-full border border-gray-300 bg-white text-black text-lg" required>
+                  <option value="user">Daftar sebagai User</option>
+                  <option value="admin">Daftar sebagai Admin</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-6 flex items-center text-gray-500">▼</div>
+              </div>
+
               {/* 🔹 Dropdown Unit Kerja Desktop */}
               <div className="relative w-8/12">
                 <select
@@ -219,6 +228,15 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
               className="w-10/12 px-4 py-2 rounded-full border bg-white border-gray-300 text-black text-base"
               required
             />
+
+            {/* 🔹 Dropdown Role Mobile */}
+            <div className="relative w-10/12">
+              <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-4 py-2 rounded-full border border-gray-300 bg-white text-black text-base" required>
+                <option value="user">Daftar sebagai User</option>
+                <option value="admin">Daftar sebagai Admin</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-gray-500">▼</div>
+            </div>
 
             {/* 🔹 Dropdown Unit Kerja Mobile */}
             <div className="relative w-10/12">

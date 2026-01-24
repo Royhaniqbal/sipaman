@@ -17,6 +17,9 @@ export default function BookingTab({
   editingBooking?: any | null;
   onFinishEdit?: (updated: any) => void;
 }) {
+
+  const [userRole, setUserRole] = useState<string>("user");
+  // const [roomsData, setRoomsData] = useState<any[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
@@ -31,19 +34,14 @@ export default function BookingTab({
   const [details, setDetails] = useState<BookingDetail[]>([]);
   const [modalRoomName, setModalRoomName] = useState("");
 
-  // 🔹 Samakan daftar dengan Register agar sinkron
-  const unitOptions = [
-    "Setditjen Binalavotas - URT",
-    "Setditjen Binalavotas - Keuangan",
-    "Setditjen Binalavotas - PEP",
-    "Setditjen Binalavotas - SDMA",
-    "Bina Lemlatvok",
-    "Bina Stankomproglat",
-    "Bina Intala",
-    "Bina Produktivitas",
-    "Bina Lavogan",
-    "Sekretariat BNSP",
-  ];
+  // Mapping Gambar berdasarkan NAMA ruangan di Database
+  const roomAssets: Record<string, string> = {
+    "Ruang Rapat Dirjen": "/gambarsatu.jpg",
+    "Ruang Rapat Sesditjen": "/gambardua.jpeg",
+    "Command Center": "/gambarempat.jpg",
+    "Ruang Rapat Lt2": "/gambarlima.jpg",
+    "Ballroom": "/gambarenam.jpg",
+  };
 
   const rooms: { id: number; name: string; capacity: string; img: string }[] = [
     { id: 1, name: "Ruang Rapat Dirjen", capacity: "24 orang", img: "/gambarsatu.jpg" },
@@ -97,6 +95,50 @@ export default function BookingTab({
     const hh = Math.floor(m / 60).toString().padStart(2, "0");
     const mm = (m % 60).toString().padStart(2, "0");
     return `${hh}:${mm}`;
+  };
+
+  const [roomsData, setRoomsData] = useState<any[]>([]);
+
+  // 1. Fetch data user (Role) & Data Ruangan dari DB
+  useEffect(() => {
+    const fetchData = async () => {
+      const token = localStorage.getItem("token");
+      
+      // Ambil data user
+      if (token) {
+        try {
+          const resUser = await fetch(`${API}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (resUser.ok) {
+            const data = await resUser.json();
+            setUserRole(data.role); // 🔹 Simpan role ke state
+            if (data.username) setPic(data.username);
+            if (data.unitKerja) setUnitKerja(data.unitKerja);
+          }
+        } catch (err) { console.error(err); }
+      }
+
+      // Ambil status ruangan dari DB
+      try {
+        const resRooms = await fetch(`${API}/api/rooms`);
+        const dataRooms = await resRooms.json();
+        setRoomsData(dataRooms);
+      } catch (err) { console.error(err); }
+    };
+    
+    fetchData();
+  }, []);
+
+  // 2. Fungsi Toggle Admin
+  const toggleRoom = async (id: number) => {
+    try {
+      const res = await fetch(`${API}/api/rooms/${id}/toggle`, { method: "PATCH" });
+      if (res.ok) {
+        setRoomsData(prev => prev.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r));
+        toast.success("Status ruangan diperbarui!");
+      }
+    } catch (err) { toast.error("Gagal update status"); }
   };
 
   // Ambil user (PIC & Unit Kerja)
@@ -251,14 +293,20 @@ export default function BookingTab({
         {/* Ruangan */}
         <div className="flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {rooms.map((room) => {
-              const isDisabled = room.id === 3;
+            {roomsData.map((room) => {
+              const asset = roomAssets[room.id] || { capacity: "?", img: "" };
+              const isAdmin = userRole === "admin";
+              const isInactive = !room.isActive;
+              const isDisabled = !room.isActive;
+
               return (
                 <div key={room.id} className={`w-full border-2 rounded-xl flex flex-col justify-between items-center p-3 transition ${selected === room.id && !isDisabled ? "border-blue-500 shadow-xl" : "border-gray-300 shadow-sm"} ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}>
                   
-                  {/* 1. Gambar Ruangan (Tanpa Relative) */}
-                  <img src={room.img} alt={room.name} className="w-full h-40 object-cover mb-2 rounded-lg" />
+                  {/* Gambar Ruangan */}
+                  {/* <img src={room.img} alt={room.name} className="w-full h-40 object-cover mb-2 rounded-lg" /> */}
+                  <img src={roomAssets[room.name] || "/assets/default-room.jpg"} alt={room.name} />
                   
+
                   {/* 2. Nama Ruangan & Tombol Info (Sejajar/Flex) */}
                   <div className="flex items-center justify-center gap-2 w-full">
                     <p className="text-base text-center">{room.name}</p>
@@ -274,15 +322,27 @@ export default function BookingTab({
                   {/* 3. Kapasitas */}
                   <p className="text-sm text-center font-normal mt-0.5">(Kapasitas {room.capacity})</p>
                   
-                  {isDisabled && <p className="text-xs text-red-500 mt-1 font-semibold">Tidak tersedia</p>}
+                  {isAdmin && (
+                    <button 
+                      onClick={() => toggleRoom(room.id)}
+                      className={`w-full py-1 text-[10px] mt-2 rounded border uppercase font-bold transition
+                        ${room.isActive ? "border-red-500 text-red-500 hover:bg-red-50" : "border-green-500 text-green-500 hover:bg-green-50"}`}
+                    >
+                      {room.isActive ? "Nonaktifkan Ruangan" : "Aktifkan Ruangan"}
+                    </button>
+                  )}
 
-                  {/* 4. Tombol Pilih */}
+                  {/* Pesan status jika mati */}
+                  {isInactive && <p className="text-[10px] text-red-600 mt-1 uppercase">🚫 Sedang Tidak Tersedia</p>}
+
                   <button 
-                    disabled={isDisabled} 
-                    onClick={() => !isDisabled && setSelected(room.id)} 
-                    className={`w-full py-1 rounded-lg mt-3 text-white transition ${isDisabled ? "bg-gray-400" : selected === room.id ? "bg-blue-700" : "bg-blue-300 hover:bg-blue-700"}`}
+                    disabled={isInactive && !isAdmin} 
+                    onClick={() => (room.isActive || isAdmin) && setSelected(room.id)} 
+                    className={`w-full py-1 rounded-lg mt-3 text-white transition 
+                      ${isInactive && !isAdmin ? "bg-gray-400 cursor-not-allowed" : 
+                        selected === room.id ? "bg-blue-700" : "bg-blue-300 hover:bg-blue-700"}`}
                   >
-                    {isDisabled ? "Tidak Bisa Dipilih" : "Pilih"}
+                    {isInactive && !isAdmin ? "Terkunci" : "Pilih"}
                   </button>
                 </div>
               );
@@ -341,7 +401,7 @@ export default function BookingTab({
           <div className="mt-4"><Toaster position="top-center" /></div>
         </div>
       </div>
-      {/* 🔹 MODAL POP UP TABEL DETAIL PEMINJAM */}
+      {/* 🔹 POP UP TABEL DETAIL PEMINJAM */}
       {showModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
