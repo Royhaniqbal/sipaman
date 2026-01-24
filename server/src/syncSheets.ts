@@ -129,3 +129,50 @@ export async function deleteBookingFromSheet(bookingData: any) {
     console.error("❌ Gagal Sinkron Sheets (Delete):", error.message);
   }
 }
+
+export async function updateProfileInSheets(oldPic: string, newPic: string, newUnit: string) {
+  try {
+    await auth.getClient();
+    
+    // 1. Ambil daftar semua sheet yang ada di file
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+    const sheetNames = spreadsheet.data.sheets?.map(s => s.properties?.title) || [];
+
+    for (const sheetName of sheetNames) {
+      // 2. Ambil data dari sheet saat ini
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${sheetName}!A:G`,
+      });
+
+      const rows = response.data.values || [];
+      const normalize = (v: any) => (v ?? "").toString().trim().toLowerCase();
+
+      // 3. Cari baris yang PIC-nya (kolom E / indeks 4) cocok
+      const updates = rows.map((row, index) => {
+        // Cek jika kolom E (PIC) cocok dengan nama lama
+        if (row[4] && normalize(row[4]) === normalize(oldPic)) {
+          return {
+            range: `${sheetName}!E${index + 1}:F${index + 1}`, // Kolom E (PIC) & F (Unit Kerja)
+            values: [[newPic, newUnit]],
+          };
+        }
+        return null;
+      }).filter(update => update !== null);
+
+      // 4. Jika ada baris yang perlu diupdate, jalankan batchUpdate
+      if (updates.length > 0) {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: SPREADSHEET_ID,
+          requestBody: {
+            data: updates as any,
+            valueInputOption: "USER_ENTERED",
+          },
+        });
+        console.log(`✅ Update profil berhasil di sheet "${sheetName}" (${updates.length} baris)`);
+      }
+    }
+  } catch (error: any) {
+    console.error("❌ Gagal Sinkron Sheets (Update Profile):", error.message);
+  }
+}

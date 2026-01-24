@@ -4,6 +4,8 @@ import jwt from "jsonwebtoken";
 import User from "../models/User";
 import Booking from "../models/Booking";
 import nodemailer from "nodemailer";
+import { Op } from "sequelize"; //  Untuk logika login OR
+import { updateProfileInSheets } from "../SyncSheets"; // Sesuaikan path file SyncSheets
 
 const router = express.Router();
 const SECRET = process.env.JWT_SECRET || "your_secret_key";
@@ -59,9 +61,17 @@ router.post("/register", async (req, res) => {
 
 // ✅ LOGIN
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body;
   try {
-    const user = await User.findOne({ where: { email } });
+    // 🔹 Cari berdasarkan Email ATAU Username
+    const user = await User.findOne({ 
+      where: {
+        [Op.or]: [
+          { email: identifier },
+          { username: identifier }
+        ]
+      } 
+    });
     if (!user) return res.status(404).json({ message: "User tidak ditemukan" });
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -118,21 +128,25 @@ router.put("/update-profile", async (req, res) => {
     const user = await User.findByPk(decoded.id);
     if (!user) return res.status(404).json({ message: "User tidak ditemukan" });
 
-    const oldUsername = user.username; // Simpan username lama
+    const oldUsername = user.username;
 
-    // Update data user
+    // 1. Update DB User
     await user.update({ username, email, unitKerja });
 
-    // Update Riwayat
+    // 2. Update DB Riwayat Booking
     if (username !== oldUsername) {
       await Booking.update(
-        { pic: username }, // Nama baru
-        { where: { pic: oldUsername } } // Di semua booking milik nama lama
+        { pic: username }, 
+        { where: { pic: oldUsername } } 
       );
     }
 
+    // 3. 🔹 Sinkronisasi ke Google Sheets (PIC dan Unit Kerja baru)
+    await updateProfileInSheets(oldUsername, username, unitKerja);
+
     res.json({ message: "Profil dan riwayat berhasil diperbarui", user: { username, email, unitKerja } });
   } catch (err) {
+    console.error("Update Profile Error:", err);
     res.status(500).json({ message: "Gagal memperbarui profil" });
   }
 });

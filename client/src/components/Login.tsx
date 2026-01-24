@@ -11,7 +11,8 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginProps) {
-  const [email, setEmail] = useState("");
+  // const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -24,14 +25,14 @@ export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }:
 
     try {
       const res = await axios.post(`${API}/api/auth/login`, {
-        email,
+        identifier,
         password,
       });
       const data = res.data as { user: any; token: string };
       localStorage.setItem("token", data.token);
       onLogin(data.user, data.token);
     } catch (err) {
-      setError("E-mail atau password salah ❌");
+      setError("Username/E-mail atau password salah ❌");
     } finally {
       setLoading(false);
     }
@@ -96,10 +97,10 @@ export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }:
               )}
 
               <input
-                type="email"
-                placeholder="E-Mail"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text" // Ubah ke text agar bisa input username
+                placeholder="Username atau E-Mail"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className="w-7/12 px-3 py-2 rounded-full border bg-white border-gray-300 text-black text-lg"
                 required
               />
@@ -188,9 +189,9 @@ export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }:
             )}
 
             <input
-              type="email"
-              placeholder="E-Mail"
-              value={email}
+              type="text"
+              placeholder="Username atau E-Mail"
+              value={identifier}
               onChange={(e) => setEmail(e.target.value)}
               className="w-10/12 px-3 py-2 rounded-full border bg-white border-gray-300 text-black text-base"
               required
