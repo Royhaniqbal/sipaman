@@ -5,10 +5,25 @@ import User from "../models/User";
 import Booking from "../models/Booking";
 import nodemailer from "nodemailer";
 import { Op } from "sequelize"; //  Untuk logika login OR
-import { updateProfileInSheets } from "../SyncSheets"; // Sesuaikan path file SyncSheets
+import { updateProfileInSheets } from "../syncSheets"; // Sesuaikan path file SyncSheets
 
 const router = express.Router();
 const SECRET = process.env.JWT_SECRET || "your_secret_key";
+
+export const isAdmin = (req: any, res: any, next: any) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Akses ditolak" });
+
+  try {
+    const decoded = jwt.verify(token, SECRET) as { role: string };
+    if (decoded.role !== "admin") {
+      return res.status(403).json({ message: "Hanya Admin yang diizinkan" });
+    }
+    next();
+  } catch (err) {
+    res.status(401).json({ message: "Token tidak valid" });
+  }
+};
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -23,6 +38,14 @@ router.post("/register", async (req, res) => {
   const { username, email, password, role, unitKerja } = req.body;
 
   try {
+    // 🔹 PROTEKSI ADMIN: Hanya boleh ada 1
+    if (role === "admin") {
+      const adminExists = await User.findOne({ where: { role: "admin" } });
+      if (adminExists) {
+        return res.status(400).json({ message: "Silahkan daftar sebagai User" });
+      }
+    }
+
     if (!unitKerja) {
       return res.status(400).json({ message: "Unit Kerja wajib diisi" });
     }

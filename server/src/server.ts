@@ -12,6 +12,8 @@ import authRoutes from "./routes/auth";
 import { appendBookingToSheet, deleteBookingFromSheet } from "./syncSheets";
 import jwt from "jsonwebtoken";
 import { sendWhatsAppMessage } from "./sendWhatsAppMessage";
+import Room from "./models/Room"; // Import model Room baru
+import { isAdmin } from "./routes/auth"; // Import middleware isAdmin (jika diletakkan di auth.ts)
 
 // ... sisa kode app.use dan endpoint Anda ...
 
@@ -30,6 +32,14 @@ app.use("/api/auth", authRoutes);
 // ✅ Endpoint: Cek ketersediaan & Ambil Detail Peminjam
 app.post("/api/check-availability", async (req: Request, res: Response) => {
   const { room, date } = req.body;
+  const roomData = await Room.findOne({ where: { name: room } });
+    if (roomData && !roomData.isActive) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "⚠️ Ruangan ini sedang tidak tersedia untuk dipinjam (Dinonaktifkan Admin)." 
+      });
+    }
+
   if (!room || !date) {
     return res.status(400).json({ error: "Room dan date wajib diisi" });
   }
@@ -211,6 +221,32 @@ app.get("/api/my-bookings", async (req: Request, res: Response) => {
     res.json(bookings);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ✅ Endpoint: Ambil semua status ruangan
+app.get("/api/rooms", async (_req, res) => {
+  try {
+    const rooms = await Room.findAll();
+    res.json(rooms);
+  } catch (err) {
+    res.status(500).json({ error: "Gagal mengambil data ruangan" });
+  }
+});
+
+// ✅ Endpoint: Toggle Status Ruangan (KHUSUS ADMIN)
+app.patch("/api/rooms/:id/toggle", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const room = await Room.findByPk(id);
+    if (!room) return res.status(404).json({ message: "Ruangan tidak ditemukan" });
+
+    room.isActive = !room.isActive;
+    await room.save();
+
+    res.json({ success: true, isActive: room.isActive });
+  } catch (err) {
+    res.status(500).json({ message: "Gagal mengubah status" });
   }
 });
 
