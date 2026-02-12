@@ -19,7 +19,7 @@ export default function BookingTab({
 }) {
 
   const [userRole, setUserRole] = useState<string>("user");
-  // const [roomsData, setRoomsData] = useState<any[]>([]);
+  const [roomsData, setRoomsData] = useState<any[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
@@ -77,7 +77,7 @@ export default function BookingTab({
 
   const bookingData = {
     id: editingBooking?.id || null,
-    room: rooms.find((r) => r.id === selected)?.name || null,
+    room: roomsData.find((r) => r.id === selected)?.name || null,
     date: selectedDate || null,
     startTime: timeStart || null,
     endTime: timeEnd || null,
@@ -97,7 +97,7 @@ export default function BookingTab({
     return `${hh}:${mm}`;
   };
 
-  const [roomsData, setRoomsData] = useState<any[]>([]);
+  
 
   // 1. Fetch data user (Role) & Data Ruangan dari DB
   useEffect(() => {
@@ -122,13 +122,22 @@ export default function BookingTab({
       // Ambil status ruangan dari DB
       try {
         const resRooms = await fetch(`${API}/api/rooms`);
-        const dataRooms = await resRooms.json();
-        setRoomsData(dataRooms);
-      } catch (err) { console.error(err); }
+        if (!resRooms.ok) throw new Error("Server error");
+          
+        const data = await resRooms.json();
+        setRoomsData(Array.isArray(data) ? data : []); // ✅ Selalu pastikan Array
+      } 
+      catch (err) {
+        console.error(err);
+        setRoomsData([]); // ✅ Cegah crash jika server 500
+      }
     };
     
     fetchData();
   }, []);
+
+  // Ambil nama ruangan yang sedang dipilih untuk keperluan form
+  const selectedRoomObject = roomsData.find((r) => r.id === selected);
 
   // 2. Fungsi Toggle Admin
   const toggleRoom = async (id: number) => {
@@ -164,36 +173,44 @@ export default function BookingTab({
 
   // Isi form kalau sedang edit
   useEffect(() => {
-    if (editingBooking) {
-      const room = rooms.find((r) => r.name === editingBooking.room);
+    if (editingBooking && roomsData.length > 0) {
+      // Cari berdasarkan nama di data yang berasal dari Database
+      const room = roomsData.find((r) => r.name === editingBooking.room);
       if (room) setSelected(room.id);
+      
       setSelectedDate(editingBooking.date || "");
       setTimeStart(editingBooking.startTime || "");
       setTimeEnd(editingBooking.endTime || "");
       setPic(editingBooking.pic || "");
       setUnitKerja(editingBooking.unitKerja || "");
-      setAgenda(editingBooking.agenda || ""); // 🔹 Set agenda saat edit
+      setAgenda(editingBooking.agenda || "");
     }
-  }, [editingBooking]);
+  }, [editingBooking, roomsData]); // Tambahkan roomsData di sini
 
   // --- Fetch Availability Logic ---
   useEffect(() => {
     const fetchAvailability = async () => {
-      if (bookingData.room && bookingData.date) {
+      // Cari nama ruangan berdasarkan ID yang dipilih dari roomsData
+      const selectedRoomName = roomsData.find(r => r.id === selected)?.name;
+
+      if (selectedRoomName && selectedDate) {
         try {
           const res = await fetch(`${API}/api/check-availability`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ room: bookingData.room, date: bookingData.date }),
+            body: JSON.stringify({ room: selectedRoomName, date: selectedDate }),
           });
+          
           if (!res.ok) { setAvailability([]); return; }
-          let slots: AvailabilitySlot[] = [];
+          
           const data = await res.json();
-          if (Array.isArray(data.available)) slots = data.available as AvailabilitySlot[];
+          let slots: AvailabilitySlot[] = Array.isArray(data.available) ? data.available : [];
 
-          if (editingBooking && editingBooking.startTime && editingBooking.endTime) {
+          // Logika penggabungan untuk mode EDIT
+          if (editingBooking && editingBooking.startTime && editingBooking.endTime && editingBooking.room === selectedRoomName) {
             slots.push({ startTime: editingBooking.startTime, endTime: editingBooking.endTime });
-            slots = slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+            slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+            
             const merged: AvailabilitySlot[] = [];
             for (const s of slots) {
               if (!merged.length) merged.push(s);
@@ -205,16 +222,19 @@ export default function BookingTab({
             }
             slots = merged;
           }
-          slots.sort((a: AvailabilitySlot, b: AvailabilitySlot) => a.startTime.localeCompare(b.startTime));
-          setAvailability(slots);
+          
+          setAvailability(slots.sort((a, b) => a.startTime.localeCompare(b.startTime)));
         } catch (err) {
           console.error("❌ Error fetch availability:", err);
           setAvailability([]);
         }
-      } else { setAvailability([]); }
+      } else { 
+        setAvailability([]); 
+      }
     };
     fetchAvailability();
-  }, [bookingData.room, bookingData.date, editingBooking]);
+    // Tambahkan roomsData ke dependency agar saat data DB datang, slot langsung muncul
+  }, [selected, selectedDate, roomsData, editingBooking]);
 
   const generateStartOptions = (): string[] => {
     if (!availability.length) return [];
@@ -291,59 +311,76 @@ export default function BookingTab({
     <div className="min-h-screen text-black font-bold bg-white pt-0 px-0">
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Ruangan */}
-        <div className="flex-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+<div className="flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {roomsData.map((room) => {
-              const asset = roomAssets[room.id] || { capacity: "?", img: "" };
-              const isAdmin = userRole === "admin";
-              const isInactive = !room.isActive;
               const isDisabled = !room.isActive;
+              const isSelected = selected === room.id;
 
               return (
-                <div key={room.id} className={`w-full border-2 rounded-xl flex flex-col justify-between items-center p-3 transition ${selected === room.id && !isDisabled ? "border-blue-500 shadow-xl" : "border-gray-300 shadow-sm"} ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}`}>
+                <div key={room.id} className={`w-full border-2 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${isSelected ? "border-blue-600 shadow-xl ring-2 ring-blue-100" : "border-gray-200 shadow-sm"}`}>
                   
-                  {/* Gambar Ruangan */}
-                  {/* <img src={room.img} alt={room.name} className="w-full h-40 object-cover mb-2 rounded-lg" /> */}
-                  <img src={roomAssets[room.name] || "/assets/default-room.jpg"} alt={room.name} />
-                  
-
-                  {/* 2. Nama Ruangan & Tombol Info (Sejajar/Flex) */}
-                  <div className="flex items-center justify-center gap-2 w-full">
-                    <p className="text-base text-center">{room.name}</p>
-                    <button 
-                      onClick={() => handleShowInfo(room.name)}
-                      className="bg-white text-blue-600 hover:text-blue-800 transition-all p-1.5 rounded-full shadow-sm border border-gray-100 hover:shadow-md active:scale-90"
-                      title="Lihat Detail Peminjam"
-                    >
-                      <Info size={18} />
-                    </button>
+                  {/* 🔹 BAGIAN GAMBAR DINAMIS 🔹 */}
+                  <div className="relative h-44 w-full bg-gray-100">
+                    <img 
+                      // Mengambil path gambar dari DB, jika kosong pakai default
+                      src={room.imageUrl ? `${API}${room.imageUrl}` : "/assets/default-room.jpg"} 
+                      alt={room.name} 
+                      className={`w-full h-full object-cover transition-all duration-500 ${isDisabled ? "grayscale opacity-40" : ""}`}
+                      onError={(e) => { (e.target as HTMLImageElement).src = "/assets/default-room.jpg" }}
+                    />
+                    {isDisabled && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="bg-red-600 text-white text-[10px] px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg">Sedang Maintenance</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* 3. Kapasitas */}
-                  <p className="text-sm text-center font-normal mt-0.5">(Kapasitas {room.capacity})</p>
-                  
-                  {isAdmin && (
-                    <button 
-                      onClick={() => toggleRoom(room.id)}
-                      className={`w-full py-1 text-[10px] mt-2 rounded border uppercase font-bold transition
-                        ${room.isActive ? "border-red-500 text-red-500 hover:bg-red-50" : "border-green-500 text-green-500 hover:bg-green-50"}`}
-                    >
-                      {room.isActive ? "Nonaktifkan Ruangan" : "Aktifkan Ruangan"}
-                    </button>
+                  <div className="p-4 flex flex-col flex-grow bg-white">
+                    <div className="flex justify-between items-start mb-1">
+                      <h3 className={`text-lg leading-tight ${isDisabled ? "text-gray-400" : "text-gray-800"}`}>{room.name}</h3>
+                      <div className="flex items-center group relative">
+                  {/* Teks kecil yang muncul di sebelah kiri ikon saat hover */}
+                  {!isDisabled && (
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute right-10 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-md whitespace-nowrap pointer-events-none font-medium">
+                      Info detail peminjam
+                    </span>
                   )}
 
-                  {/* Pesan status jika mati */}
-                  {isInactive && <p className="text-[10px] text-red-600 mt-1 uppercase">🚫 Sedang Tidak Tersedia</p>}
-
                   <button 
-                    disabled={isInactive && !isAdmin} 
-                    onClick={() => (room.isActive || isAdmin) && setSelected(room.id)} 
-                    className={`w-full py-1 rounded-lg mt-3 text-white transition 
-                      ${isInactive && !isAdmin ? "bg-gray-400 cursor-not-allowed" : 
-                        selected === room.id ? "bg-blue-700" : "bg-blue-300 hover:bg-blue-700"}`}
+                    onClick={() => handleShowInfo(room.name)}
+                    className={`p-1.5 rounded-full transition-all duration-300 active:scale-95 ${
+                      isDisabled 
+                        ? "text-gray-300 cursor-not-allowed" 
+                        : "bg-blue-50 text-blue-400 hover:bg-blue-600 hover:text-white shadow-sm"
+                    }`}
+                    disabled={isDisabled}
                   >
-                    {isInactive && !isAdmin ? "Terkunci" : "Pilih"}
+                    <Info size={20} strokeWidth={2.5} />
                   </button>
+                </div>
+                    </div>
+                    <p className="text-xs font-normal text-gray-500 mb-4 italic">Kapasitas: {room.capacity}</p>
+
+                    <div className="mt-auto space-y-2">
+                      {userRole === "admin" && (
+                        <button 
+                          onClick={() => toggleRoom(room.id)}
+                          className={`w-full py-1.5 text-[10px] rounded-lg border uppercase font-bold transition ${room.isActive ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white" : "bg-green-600 text-white border-green-600"}`}
+                        >
+                          {room.isActive ? "Matikan Akses" : "Aktifkan Akses"}
+                        </button>
+                      )}
+
+                      <button 
+                        disabled={isDisabled}
+                        onClick={() => setSelected(room.id)} 
+                        className={`w-full py-2.5 rounded-xl font-bold transition-all active:scale-95 ${isDisabled ? "bg-gray-200 text-gray-400 cursor-not-allowed" : isSelected ? "bg-blue-600 text-white shadow-lg" : "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"}`}
+                      >
+                        {isDisabled ? "Terkunci" : isSelected ? "Terpilih" : "Pilih Ruangan"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -394,7 +431,7 @@ export default function BookingTab({
             />
           </div>
 
-          <button onClick={handleSubmit} className="w-full py-3 rounded-full bg-blue-300 hover:bg-blue-700 text-white font-semibold transition active:scale-95">
+          <button onClick={handleSubmit} className="w-full py-3 rounded-full bg-blue-600 hover:bg-blue-800 text-white font-semibold transition active:scale-95">
             {editingBooking ? "Simpan Perubahan" : "Kirim Pengajuan"}
           </button>
 

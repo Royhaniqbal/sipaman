@@ -18,7 +18,7 @@ export async function connectDB() {
   try {
     await sequelize.authenticate();
     // sync() akan membuat table otomatis jika belum ada
-    await sequelize.sync({ alter: true }); 
+    await sequelize.sync(); 
     console.log("✅ MySQL (Sequelize) connected");
   } catch (err) {
     console.error("❌ MySQL connection error:", err);

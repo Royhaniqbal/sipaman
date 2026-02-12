@@ -14,8 +14,11 @@ import jwt from "jsonwebtoken";
 import { sendWhatsAppMessage } from "./sendWhatsAppMessage";
 import Room from "./models/Room"; // Import model Room baru
 import { isAdmin } from "./routes/auth"; // Import middleware isAdmin (jika diletakkan di auth.ts)
+import { sequelize } from "./db";
 
-// ... sisa kode app.use dan endpoint Anda ...
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,8 +27,39 @@ const SECRET = process.env.JWT_SECRET || "your_secret_key";
 app.use(cors());
 app.use(bodyParser.json());
 
+const uploadDir = "uploads/";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    // Format nama file: room-1700000000.jpg
+    cb(null, `room-${Date.now()}${path.extname(file.originalname)}`);
+  },
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 } // Batas 2MB agar tidak membebani cPanel
+});
+
+// EXPOSE FOLDER UPLOAD AGAR BISA DIAKSES URL ---
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 // ✅ Connect ke MySQL
-connectDB();
+connectDB().then(async () => {
+  try {
+    // alter: true akan memeriksa tabel dan menambahkan kolom yang kurang otomatis
+    await sequelize.sync({ alter: true });
+    console.log("✅ Database synced and columns updated!");
+  } catch (err) {
+    console.error("❌ Sync failed:", err);
+  }
+});
 
 app.use("/api/auth", authRoutes);
 
@@ -247,6 +281,41 @@ app.patch("/api/rooms/:id/toggle", async (req, res) => {
     res.json({ success: true, isActive: room.isActive });
   } catch (err) {
     res.status(500).json({ message: "Gagal mengubah status" });
+  }
+});
+
+// --- UPDATE ENDPOINT TAMBAH RUANGAN (DENGAN MULTER) ---
+app.post("/api/rooms", isAdmin, upload.single("image"), async (req: Request, res: Response) => {
+  const { name, capacity } = req.body;
+
+  if (!name || !capacity) {
+    return res.status(400).json({ success: false, message: "Nama dan Kapasitas wajib diisi" });
+  }
+
+  try {
+    const existingRoom = await Room.findOne({ where: { name } });
+    if (existingRoom) {
+      return res.status(409).json({ success: false, message: "Nama ruangan sudah terdaftar" });
+    }
+
+    // Ambil path file jika admin mengunggah gambar
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    const newRoom = await Room.create({
+      name,
+      capacity,
+      imageUrl, // Pastikan field ini sudah ada di model Room.ts
+      isActive: true 
+    });
+
+    res.status(201).json({ 
+      success: true, 
+      message: "Ruangan berhasil ditambahkan", 
+      data: newRoom 
+    });
+  } catch (error) {
+    console.error("❌ Error add room:", error);
+    res.status(500).json({ success: false, message: "Gagal menambahkan ruangan ke database" });
   }
 });
 
