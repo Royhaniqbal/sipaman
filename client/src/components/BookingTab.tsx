@@ -5,7 +5,14 @@ import { Info, X, Plus, Trash2, Edit, Image as ImageIcon } from "lucide-react";
 import axios from "axios";
 
 type AvailabilitySlot = { startTime: string; endTime: string };
-type BookingDetail = { startTime: string; endTime: string; pic: string; unitKerja: string; agenda: string };
+type BookingDetail = { 
+  startTime: string; 
+  endTime: string; 
+  pic: string; 
+  unitKerja: string; 
+  agenda: string;
+  phone?: string; 
+};
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -28,6 +35,7 @@ export default function BookingTab({
   const [pic, setPic] = useState<string>("");
   const [unitKerja, setUnitKerja] = useState<string>("");
   const [agenda, setAgenda] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
 
   const [showModal, setShowModal] = useState(false);
   const [details, setDetails] = useState<BookingDetail[]>([]);
@@ -64,6 +72,7 @@ export default function BookingTab({
           setUserRole(data.role);
           if (data.username) setPic(data.username);
           if (data.unitKerja) setUnitKerja(data.unitKerja);
+          if (data.phone) setPhone(data.phone);
         }
       } catch (err) {
         console.error(err);
@@ -180,6 +189,7 @@ export default function BookingTab({
     pic: pic || null,
     unitKerja: unitKerja || null,
     agenda: agenda || null,
+    phone: phone || null,
   };
 
   const parseToMinutes = (t: string) => {
@@ -254,7 +264,11 @@ export default function BookingTab({
       if (!res.ok) throw new Error(data.message);
       
       toast.success("✅ Booking berhasil disimpan!");
-      setSelected(null); setSelectedDate(""); setTimeStart(""); setTimeEnd(""); setAgenda("");
+      setSelected(null); 
+      setSelectedDate(""); 
+      setTimeStart(""); 
+      setTimeEnd(""); 
+      setAgenda("");
       if (editingBooking && onFinishEdit) onFinishEdit(data);
     } catch (err: any) {
       toast.error(`❌ Error: ${err.message}`);
@@ -491,13 +505,25 @@ export default function BookingTab({
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full text-left text-sm font-normal">
                     <thead className="bg-gray-100 font-bold border-b text-gray-700">
-                      <tr><th className="p-3">Waktu</th><th className="p-3">PIC</th><th className="p-3">Unit Kerja</th><th className="p-3">Agenda</th></tr>
+                      <tr>
+                        <th className="p-3">Waktu</th>
+                        <th className="p-3">PIC</th>
+                        <th className="p-3">WhatsApp</th>
+                        <th className="p-3">Unit Kerja</th>
+                        <th className="p-3">Agenda</th></tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {details.map((d, i) => (
                         <tr key={i} className="hover:bg-gray-50 transition-colors">
                           <td className="p-3 whitespace-nowrap">{d.startTime} - {d.endTime}</td>
                           <td className="p-3">{d.pic}</td>
+                          <td className="p-3 text-blue-600 font-medium">
+                            {d.phone ? (
+                              <a href={`https://wa.me/${d.phone.replace(/^0/, '62')}`} target="_blank" rel="noreferrer" className="hover:underline">
+                                {d.phone}
+                              </a>
+                            ) : "-"}
+                          </td>
                           <td className="p-3">{d.unitKerja}</td>
                           <td className="p-3 italic text-gray-600">{d.agenda}</td>
                         </tr>

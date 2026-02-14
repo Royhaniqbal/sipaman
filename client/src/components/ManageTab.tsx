@@ -22,6 +22,7 @@ export default function ManageTab() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [unitKerja, setUnitKerja] = useState("");
+  const [phone, setPhone] = useState("");
   const [isEditing, setIsEditing] = useState(false); // Mode edit
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,6 +40,7 @@ export default function ManageTab() {
         setUsername(fetchedUser.username || "");
         setEmail(fetchedUser.email || "");
         setUnitKerja(fetchedUser.unitKerja || "");
+        setPhone(fetchedUser.phone || "");
       } catch (err: any) {
         console.error("❌ Failed to fetch user:", err.message);
       }
@@ -53,7 +55,7 @@ export default function ManageTab() {
     try {
       await axios.put(
         `${API}/api/auth/update-profile`, 
-        { username, email, unitKerja },
+        { username, email, unitKerja, phone },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success("Profil berhasil diperbarui!");
@@ -134,6 +136,20 @@ export default function ManageTab() {
             />
           </div>
           
+          <div>
+            <label className="block mb-1 font-semibold text-gray-700">Nomor WhatsApp</label>
+            <input
+              type="text"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Contoh: 08123456789"
+              readOnly={!isEditing}
+              className={`w-full p-3 border border-gray-200 rounded-xl transition ${
+                isEditing ? "bg-white border-blue-400 shadow-sm" : "bg-gray-50 text-gray-500 cursor-not-allowed"
+              }`}
+            />
+          </div>
+
           <div>
             <label className="block mb-1 font-semibold text-gray-700">Unit Kerja</label>
             {isEditing ? (

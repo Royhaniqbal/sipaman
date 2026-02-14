@@ -35,7 +35,8 @@ const transporter = nodemailer.createTransport({
 
 // ✅ REGISTER
 router.post("/register", async (req, res) => {
-  const { username, email, password, role, unitKerja } = req.body;
+  // 1. Tambahkan 'phone' di sini
+  const { username, email, password, role, unitKerja, phone } = req.body;
 
   try {
     // 🔹 PROTEKSI ADMIN: Hanya boleh ada 1
@@ -46,8 +47,9 @@ router.post("/register", async (req, res) => {
       }
     }
 
-    if (!unitKerja) {
-      return res.status(400).json({ message: "Unit Kerja wajib diisi" });
+    // 2. Validasi agar phone wajib diisi
+    if (!unitKerja || !phone) {
+      return res.status(400).json({ message: "Unit Kerja dan Nomor WhatsApp wajib diisi" });
     }
 
     const existingUser = await User.findOne({ where: { email } });
@@ -55,20 +57,23 @@ router.post("/register", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     
+    // 3. Masukkan 'phone' ke dalam database
     const newUser = await User.create({
       username,
       email,
       password: hashedPassword,
       role: role || "user",
-      unitKerja, 
+      unitKerja,
+      phone, // Simpan nomor hp
     });
 
-    // 🔹 Langkah 4: Pastikan Payload JWT Lengkap
+    // 4. Masukkan 'phone' ke dalam Payload JWT agar bisa diakses Frontend tanpa fetch ulang
     const token = jwt.sign(
       { 
         id: newUser.id, 
         username: newUser.username, 
-        unitKerja: newUser.unitKerja, // Sangat penting untuk Langkah 5 nanti
+        unitKerja: newUser.unitKerja,
+        phone: newUser.phone, // Tambahkan ini
         role: newUser.role 
       }, 
       SECRET, 
@@ -106,6 +111,7 @@ router.post("/login", async (req, res) => {
         id: user.id, 
         username: user.username, 
         unitKerja: user.unitKerja, // Data ini akan dibaca otomatis oleh Frontend
+        phone: user.phone,
         role: user.role 
       }, 
       SECRET, 
@@ -146,7 +152,7 @@ router.put("/update-profile", async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, SECRET) as { id: number };
-    const { username, email, unitKerja } = req.body;
+    const { username, email, unitKerja, phone } = req.body;
 
     const user = await User.findByPk(decoded.id);
     if (!user) return res.status(404).json({ message: "User tidak ditemukan" });
@@ -154,20 +160,26 @@ router.put("/update-profile", async (req, res) => {
     const oldUsername = user.username;
 
     // 1. Update DB User
-    await user.update({ username, email, unitKerja });
+    await user.update({ username, email, unitKerja, phone });
 
     // 2. Update DB Riwayat Booking
-    if (username !== oldUsername) {
-      await Booking.update(
-        { pic: username }, 
-        { where: { pic: oldUsername } } 
-      );
-    }
+    await Booking.update(
+      { 
+        pic: username, 
+        phone: phone
+      }, 
+      { where: { pic: oldUsername } } 
+    );
 
     // 3. 🔹 Sinkronisasi ke Google Sheets (PIC dan Unit Kerja baru)
-    await updateProfileInSheets(oldUsername, username, unitKerja);
+    if (typeof updateProfileInSheets === "function") {
+      await updateProfileInSheets(oldUsername, username, unitKerja, phone);
+    }
 
-    res.json({ message: "Profil dan riwayat berhasil diperbarui", user: { username, email, unitKerja } });
+    res.json({ 
+      message: "Profil dan riwayat berhasil diperbarui", 
+      user: { username, email, unitKerja, phone } 
+    });
   } catch (err) {
     console.error("Update Profile Error:", err);
     res.status(500).json({ message: "Gagal memperbarui profil" });

@@ -61,7 +61,7 @@ export async function appendBookingToSheet(bookingData: any) {
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A:G`,
+      range: `${sheetName}!A:H`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [[
@@ -72,6 +72,7 @@ export async function appendBookingToSheet(bookingData: any) {
           bookingData.pic,
           bookingData.unitKerja,
           bookingData.agenda,
+          bookingData.phone,
         ]],
       },
     });
@@ -91,7 +92,7 @@ export async function deleteBookingFromSheet(bookingData: any) {
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheetName}!A:G`,
+      range: `${sheetName}!A:H`,
     });
 
     const rows = response.data.values || [];
@@ -130,37 +131,40 @@ export async function deleteBookingFromSheet(bookingData: any) {
   }
 }
 
-export async function updateProfileInSheets(oldPic: string, newPic: string, newUnit: string) {
+// syncSheets.ts
+
+// Tambahkan parameter newPhone
+export async function updateProfileInSheets(oldPic: string, newPic: string, newUnit: string, newPhone: string) {
   try {
     await auth.getClient();
     
-    // 1. Ambil daftar semua sheet yang ada di file
     const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
     const sheetNames = spreadsheet.data.sheets?.map(s => s.properties?.title) || [];
 
     for (const sheetName of sheetNames) {
-      // 2. Ambil data dari sheet saat ini
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${sheetName}!A:G`,
+        range: `${sheetName}!A:H`, // Range dipastikan sampai kolom H
       });
 
       const rows = response.data.values || [];
       const normalize = (v: any) => (v ?? "").toString().trim().toLowerCase();
 
-      // 3. Cari baris yang PIC-nya (kolom E / indeks 4) cocok
+      // Cari baris dan siapkan data update
       const updates = rows.map((row, index) => {
-        // Cek jika kolom E (PIC) cocok dengan nama lama
+        // Cek jika kolom E (PIC / index 4) cocok
         if (row[4] && normalize(row[4]) === normalize(oldPic)) {
           return {
-            range: `${sheetName}!E${index + 1}:F${index + 1}`, // Kolom E (PIC) & F (Unit Kerja)
-            values: [[newPic, newUnit]],
+            // Kita update dari range E (PIC) sampai H (Phone)
+            // Kolom: E (4), F (5), G (6), H (7)
+            range: `${sheetName}!E${index + 1}:H${index + 1}`,
+            // row[6] adalah kolom G (Agenda), kita pertahankan nilainya agar tidak terhapus
+            values: [[newPic, newUnit, row[6] || "", newPhone]],
           };
         }
         return null;
       }).filter(update => update !== null);
 
-      // 4. Jika ada baris yang perlu diupdate, jalankan batchUpdate
       if (updates.length > 0) {
         await sheets.spreadsheets.values.batchUpdate({
           spreadsheetId: SPREADSHEET_ID,
@@ -169,7 +173,7 @@ export async function updateProfileInSheets(oldPic: string, newPic: string, newU
             valueInputOption: "USER_ENTERED",
           },
         });
-        console.log(`✅ Update profil berhasil di sheet "${sheetName}" (${updates.length} baris)`);
+        console.log(`✅ Update profil & WA berhasil di sheet "${sheetName}" (${updates.length} baris)`);
       }
     }
   } catch (error: any) {

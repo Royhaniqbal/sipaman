@@ -123,9 +123,9 @@ app.post("/api/check-availability", async (req: Request, res: Response) => {
 // ✅ Endpoint: Buat booking baru
 // ✅ Endpoint: Buat booking baru
 app.post("/api/book", async (req: Request, res: Response) => {
-  const { room, date, startTime, endTime, pic, unitKerja, agenda } = req.body;
+  const { room, date, startTime, endTime, pic, unitKerja, agenda, phone } = req.body;
 
-  if (!room || !date || !startTime || !endTime || !pic || !unitKerja || !agenda) {
+  if (!room || !date || !startTime || !endTime || !pic || !unitKerja || !agenda || !phone) {
     return res.status(400).json({ success: false, message: "Data tidak lengkap" });
   }
 
@@ -144,14 +144,14 @@ app.post("/api/book", async (req: Request, res: Response) => {
     }
 
     // 2. Simpan ke Database (Wajib Berhasil)
-    const newBooking = await Booking.create({ room, date, startTime, endTime, pic, unitKerja, agenda });
+    const newBooking = await Booking.create({ room, date, startTime, endTime, pic, unitKerja, agenda, phone });
 
     // 3. Sinkron Sheets & WA secara Independen (Jangan pakai 'await' yang menggandeng keduanya)
     
-    appendBookingToSheet({ room, date, startTime, endTime, pic, unitKerja, agenda })
+    appendBookingToSheet({ room, date, startTime, endTime, pic, unitKerja, agenda, phone })
       .catch(err => console.error("❌ Gagal Sinkron Sheets:", err.message));
 
-    const msg = `📢 Booking Baru!\n🏢 ${room}\n📅 ${date}\n⏰ ${startTime} - ${endTime}\n📝 Agenda: ${agenda}\n👤 ${pic}\n🏬 Unit Kerja: ${unitKerja}`;
+    const msg = `📢 Booking Baru!\n🏢 ${room}\n📅 ${date}\n⏰ ${startTime} - ${endTime}\n📝 Agenda: ${agenda}\n👤 ${pic}\n📱 WA: ${phone}\n🏬 Unit Kerja: ${unitKerja}`;
     
     sendWhatsAppMessage("6281335382726", msg)
       .catch(err => console.error("❌ Gagal Kirim WA:", err.message));
@@ -168,7 +168,7 @@ app.post("/api/book", async (req: Request, res: Response) => {
 // ✅ Endpoint: Update booking
 app.put("/api/book/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { room, date, startTime, endTime, pic, unitKerja, agenda } = req.body;
+  const { room, date, startTime, endTime, pic, unitKerja, agenda, phone } = req.body;
 
   try {
     const booking = await Booking.findByPk(id);
@@ -188,13 +188,13 @@ app.put("/api/book/:id", async (req: Request, res: Response) => {
 
     const oldData = { ...booking.get({ plain: true }) };
 
-    await booking.update({ room, date, startTime, endTime, pic, unitKerja, agenda });
+    await booking.update({ room, date, startTime, endTime, pic, unitKerja, agenda, phone });
 
     await deleteBookingFromSheet(oldData);
-    await appendBookingToSheet({ room, date, startTime, endTime, pic, unitKerja, agenda });
+    await appendBookingToSheet({ room, date, startTime, endTime, pic, unitKerja, agenda, phone });
 
     // 🔹 Pesan WA Update (Agenda sudah masuk di sini)
-    const msg = `🔄 UPDATE BOOKING!\n🏢 ${room}\n📅 ${date}\n⏰ ${startTime} - ${endTime}\n📝 Agenda: ${agenda}\n👤 ${pic}\n🏬 Unit Kerja: ${unitKerja}\n\nStatus: Diperbarui oleh user.`;
+    const msg = `🔄 UPDATE BOOKING!\n🏢 ${room}\n📅 ${date}\n⏰ ${startTime} - ${endTime}\n📝 Agenda: ${agenda}\n👤 ${pic}\n📱 WA: ${phone}\n🏬 Unit Kerja: ${unitKerja}\n\nStatus: Diperbarui oleh user.`;
     
     await sendWhatsAppMessage("6281335382726", msg);
 
@@ -218,7 +218,7 @@ app.post("/api/cancel-booking", async (req: Request, res: Response) => {
     await booking.destroy(); 
 
     // ✅ Pesan WA Pembatalan (Ditambahkan baris Agenda)
-    const msg = `❌ PEMBATALAN BOOKING!\n🏢 ${dataToDelete.room}\n📅 ${dataToDelete.date}\n⏰ ${dataToDelete.startTime} - ${dataToDelete.endTime}\n📝 Agenda: ${dataToDelete.agenda}\n👤 ${dataToDelete.pic}\n🏬 Unit Kerja: ${dataToDelete.unitKerja}\n\nStatus: Dibatalkan oleh user.`;
+    const msg = `❌ PEMBATALAN BOOKING!\n🏢 ${dataToDelete.room}\n📅 ${dataToDelete.date}\n⏰ ${dataToDelete.startTime} - ${dataToDelete.endTime}\n📝 Agenda: ${dataToDelete.agenda}\n👤 ${dataToDelete.pic}\n📱 WA: ${dataToDelete.phone}\n🏬 Unit Kerja: ${dataToDelete.unitKerja}\n\nStatus: Dibatalkan oleh user.`;
     
     await sendWhatsAppMessage("6281335382726", msg);
 

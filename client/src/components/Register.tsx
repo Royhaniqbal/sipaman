@@ -1,6 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-import { Eye, EyeOff, Loader2, Building2 } from "lucide-react"; // Tambah icon Building
+import { Eye, EyeOff, Loader2 } from "lucide-react"; // Tambah icon Building
 
 const API = import.meta.env.VITE_API_BASE_URL;
 
@@ -28,6 +28,7 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [unitKerja, setUnitKerja] = useState(""); // 🔹 State Baru
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState("user");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -47,6 +48,7 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
         username,
         email,
         password,
+        phone,
         role,
         unitKerja, // 🔹 Kirim ke Backend
       });
@@ -126,33 +128,16 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
                 className="w-8/12 px-5 py-2 rounded-full border bg-white border-gray-300 text-black text-lg"
                 required
               />
-
-              {/* 🔹 Dropdown Role Desktop */}
-              <div className="relative w-8/12">
-                <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-5 py-2 rounded-full border border-gray-300 bg-white text-black text-lg" required>
-                  <option value="user">Daftar sebagai User</option>
-                  <option value="admin">Daftar sebagai Admin</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-6 flex items-center text-gray-500">▼</div>
-              </div>
-
-              {/* 🔹 Dropdown Unit Kerja Desktop */}
-              <div className="relative w-8/12">
-                <select
-                  value={unitKerja}
-                  onChange={(e) => setUnitKerja(e.target.value)}
-                  className="appearance-none w-full px-5 py-2 rounded-full border border-gray-300 bg-white text-black text-lg"
-                  required
-                >
-                  <option value="" disabled>Pilih Unit Kerja</option>
-                  {UNIT_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-6 flex items-center text-gray-500">▼</div>
-              </div>
-
-              <div className="relative w-8/12">
+              <input
+                type="tel"
+                placeholder="Nomor WA (Contoh: 08123456789)"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                className="w-8/12 px-5 py-2 rounded-full border bg-white border-gray-300 text-black text-lg"
+                required
+              />
+              
+            <div className="relative w-8/12">
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Password"
@@ -169,6 +154,32 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+
+               {/* 🔹 Dropdown Unit Kerja Desktop */}
+              <div className="relative w-8/12">
+                <select
+                  value={unitKerja}
+                  onChange={(e) => setUnitKerja(e.target.value)}
+                  className="appearance-none w-full px-5 py-2 rounded-full border border-gray-300 bg-white text-black text-lg"
+                  required
+                >
+                  <option value="" disabled>Pilih Unit Kerja</option>
+                  {UNIT_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-6 flex items-center text-gray-500">▼</div>
+              </div>
+
+              {/* 🔹 Dropdown Role Desktop */}
+              <div className="relative w-8/12">
+                <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-5 py-2 rounded-full border border-gray-300 bg-white text-black text-lg" required>
+                  <option value="user">Daftar sebagai User</option>
+                  <option value="admin">Daftar sebagai Admin</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-6 flex items-center text-gray-500">▼</div>
+              </div>
+
 
               {loading && (
                 <div className="flex flex-col items-center justify-center text-white mt-2">
@@ -194,7 +205,7 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
             </p>
           </div>
         </div>
-        <p className="absolute bottom-6 right-[15.5rem] text-[9px] text-white">Dibuat oleh M. Royhan Iqbal</p>
+        {/* <p className="absolute bottom-6 right-[15.5rem] text-[9px] text-white">Dibuat oleh M. Royhan Iqbal</p> */}
       </div>
 
       {/* Mobile view */}
@@ -229,30 +240,14 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
               required
             />
 
-            {/* 🔹 Dropdown Role Mobile */}
-            <div className="relative w-10/12">
-              <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-4 py-2 rounded-full border border-gray-300 bg-white text-black text-base" required>
-                <option value="user">Daftar sebagai User</option>
-                <option value="admin">Daftar sebagai Admin</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-gray-500">▼</div>
-            </div>
-
-            {/* 🔹 Dropdown Unit Kerja Mobile */}
-            <div className="relative w-10/12">
-              <select
-                value={unitKerja}
-                onChange={(e) => setUnitKerja(e.target.value)}
-                className="appearance-none w-full px-4 py-2 rounded-full border border-gray-300 bg-white text-black text-base"
-                required
-              >
-                <option value="" disabled>Pilih Unit Kerja</option>
-                {UNIT_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-gray-500">▼</div>
-            </div>
+            <input
+              type="tel"
+              placeholder="Nomor WA (Contoh: 08123456789)"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+              className="w-10/12 px-4 py-2 rounded-full border bg-white border-gray-300 text-black text-base"
+              required
+            />
 
             <div className="relative w-10/12">
               <input
@@ -271,6 +266,33 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            
+            
+            <div className="relative w-10/12">
+              <select
+                value={unitKerja}
+                onChange={(e) => setUnitKerja(e.target.value)}
+                className="appearance-none w-full px-4 py-2 rounded-full border border-gray-300 bg-white text-black text-base"
+                required
+              >
+                <option value="" disabled>Pilih Unit Kerja</option>
+                {UNIT_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-gray-500">▼</div>
+            </div>
+
+            {/* 🔹 Dropdown Role Mobile */}
+            <div className="relative w-10/12">
+              <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-4 py-2 rounded-full border border-gray-300 bg-white text-black text-base" required>
+                <option value="user">Daftar sebagai User</option>
+                <option value="admin">Daftar sebagai Admin</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-gray-500">▼</div>
+            </div>
+
+            {/* 🔹 Dropdown Unit Kerja Mobile */}
 
             <button
               type="submit"
@@ -287,7 +309,7 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
               Login di sini
             </button>
           </p>
-          <p className="mt-6 mb-4 text-[9px] text-center text-white">Dibuat oleh M. Royhan Iqbal</p>
+          {/* <p className="mt-6 mb-4 text-[9px] text-center text-white">Dibuat oleh M. Royhan Iqbal</p> */}
         </div>
       </div>
     </div>

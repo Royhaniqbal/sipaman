@@ -24,6 +24,10 @@ Booking.init(
     startTime: { type: DataTypes.STRING, allowNull: false },
     endTime: { type: DataTypes.STRING, allowNull: false },
     pic: { type: DataTypes.STRING, allowNull: false },
+    phone: {
+      type: DataTypes.STRING,
+      allowNull: true, // Atau false jika wajib
+    },
     unitKerja: { type: DataTypes.STRING, allowNull: false },
     agenda: { 
       type: DataTypes.TEXT, // Menggunakan TEXT agar bisa menampung input yang panjang

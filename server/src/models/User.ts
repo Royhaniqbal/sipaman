@@ -6,6 +6,7 @@ class User extends Model {
   public username!: string;
   public email!: string;
   public password!: string;
+  public phone!: string;
   public role!: string;
   public unitKerja!: string; // ✅ Menambahkan properti di class
 
@@ -28,6 +29,10 @@ User.init(
       validate: { isEmail: true }
     },
     password: { type: DataTypes.STRING, allowNull: false },
+    phone: {
+      type: DataTypes.STRING,
+      allowNull: false, 
+    },
     role: { type: DataTypes.STRING, defaultValue: "user" },
     unitKerja: {
       type: DataTypes.STRING,
