@@ -147,7 +147,6 @@ app.post("/api/book", async (req: Request, res: Response) => {
     const newBooking = await Booking.create({ room, date, startTime, endTime, pic, unitKerja, agenda });
 
     // 3. Sinkron Sheets & WA secara Independen (Jangan pakai 'await' yang menggandeng keduanya)
-    // Kita jalankan tanpa await di depan fungsi agar jika satu gagal, respon API tetap sukses
     
     appendBookingToSheet({ room, date, startTime, endTime, pic, unitKerja, agenda })
       .catch(err => console.error("❌ Gagal Sinkron Sheets:", err.message));
@@ -316,6 +315,62 @@ app.post("/api/rooms", isAdmin, upload.single("image"), async (req: Request, res
   } catch (error) {
     console.error("❌ Error add room:", error);
     res.status(500).json({ success: false, message: "Gagal menambahkan ruangan ke database" });
+  }
+});
+
+// ✅ Endpoint: Hapus Ruangan (KHUSUS ADMIN)
+app.delete("/api/rooms/:id", isAdmin, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Cari dulu ruangannya
+    const room = await Room.findByPk(id);
+    if (!room) {
+      return res.status(404).json({ success: false, message: "Ruangan tidak ditemukan" });
+    }
+
+    // 2. (Opsional) Hapus file gambar dari folder uploads agar tidak menumpuk
+    if (room.imageUrl) {
+      const filePath = path.join(process.cwd(), room.imageUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    // 3. Hapus data dari database
+    await room.destroy();
+
+    res.json({ success: true, message: "Ruangan berhasil dihapus" });
+  } catch (error) {
+    console.error("❌ Error delete room:", error);
+    res.status(500).json({ success: false, message: "Gagal menghapus ruangan" });
+  }
+});
+
+// ✅ Endpoint: Update Ruangan (KHUSUS ADMIN)
+app.put("/api/rooms/:id", isAdmin, upload.single("image"), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, capacity } = req.body;
+    const room = await Room.findByPk(id);
+
+    if (!room) return res.status(404).json({ success: false, message: "Ruangan tidak ditemukan" });
+
+    // Jika ada file baru, hapus foto lama (opsional)
+    let imageUrl = room.imageUrl;
+    if (req.file) {
+      if (room.imageUrl) {
+        const oldPath = path.join(process.cwd(), room.imageUrl);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      imageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    await room.update({ name, capacity, imageUrl });
+
+    res.json({ success: true, message: "Ruangan berhasil diperbarui" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Gagal update ruangan" });
   }
 });
 

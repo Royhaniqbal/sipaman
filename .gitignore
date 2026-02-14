@@ -1,1 +1,18 @@
 server/config/google-credentials.json
+
+# Dependency folders
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment variables
+.env
+server/.env
+
+# Build outputs
+dist/
+server/dist/
+
+# Uploads & Logs
+server/uploads/
+*.log

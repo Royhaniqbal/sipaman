@@ -1,7 +1,8 @@
 // src/components/BookingTab.tsx
 import { useState, useEffect } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { Info, X } from "lucide-react";
+import { Info, X, Plus, Trash2, Edit, Image as ImageIcon } from "lucide-react";
+import axios from "axios";
 
 type AvailabilitySlot = { startTime: string; endTime: string };
 type BookingDetail = { startTime: string; endTime: string; pic: string; unitKerja: string; agenda: string };
@@ -9,7 +10,7 @@ type BookingDetail = { startTime: string; endTime: string; pic: string; unitKerj
 const API = import.meta.env.VITE_API_BASE_URL;
 
 export default function BookingTab({
-  setHistory,
+  // setHistory,
   editingBooking = null,
   onFinishEdit,
 }: {
@@ -17,7 +18,6 @@ export default function BookingTab({
   editingBooking?: any | null;
   onFinishEdit?: (updated: any) => void;
 }) {
-
   const [userRole, setUserRole] = useState<string>("user");
   const [roomsData, setRoomsData] = useState<any[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
@@ -27,37 +27,135 @@ export default function BookingTab({
   const [timeEnd, setTimeEnd] = useState<string>("");
   const [pic, setPic] = useState<string>("");
   const [unitKerja, setUnitKerja] = useState<string>("");
-  const [agenda, setAgenda] = useState<string>(""); // 🔹 State Baru untuk Agenda
+  const [agenda, setAgenda] = useState<string>("");
 
-  // 🔹 State Baru untuk Modal Detail
   const [showModal, setShowModal] = useState(false);
   const [details, setDetails] = useState<BookingDetail[]>([]);
   const [modalRoomName, setModalRoomName] = useState("");
 
-  // Mapping Gambar berdasarkan NAMA ruangan di Database
-  const roomAssets: Record<string, string> = {
-    "Ruang Rapat Dirjen": "/gambarsatu.jpg",
-    "Ruang Rapat Sesditjen": "/gambardua.jpeg",
-    "Command Center": "/gambarempat.jpg",
-    "Ruang Rapat Lt2": "/gambarlima.jpg",
-    "Ballroom": "/gambarenam.jpg",
+  // --- STATE MANAGEMENT RUANGAN ---
+  const [isLoading, setIsLoading] = useState(false);
+  const [newRoom, setNewRoom] = useState({ name: "", capacity: "" });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isEditingRoom, setIsEditingRoom] = useState(false);
+  const [editingRoomData, setEditingRoomData] = useState<any>(null);
+
+  const fetchRooms = async () => {
+    try {
+      const res = await fetch(`${API}/api/rooms`);
+      const data = await res.json();
+      setRoomsData(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const rooms: { id: number; name: string; capacity: string; img: string }[] = [
-    { id: 1, name: "Ruang Rapat Dirjen", capacity: "24 orang", img: "/gambarsatu.jpg" },
-    { id: 2, name: "Ruang Rapat Sesditjen", capacity: "10 orang", img: "/gambardua.jpeg" },
-    { id: 3, name: "Command Center", capacity: "12 orang", img: "/gambarempat.jpg" },
-    { id: 4, name: "Ruang Rapat Lt2", capacity: "16 orang", img: "/gambarlima.jpg" },
-    { id: 5, name: "Ballroom", capacity: "400 orang", img: "/gambarenam.jpg" },
-  ];
+  useEffect(() => {
+    const fetchUser = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const resUser = await fetch(`${API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (resUser.ok) {
+          const data = await resUser.json();
+          setUserRole(data.role);
+          if (data.username) setPic(data.username);
+          if (data.unitKerja) setUnitKerja(data.unitKerja);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchUser();
+    fetchRooms();
+  }, []);
 
-  // 🔹 Fungsi Baru: Ambil detail pendaftar dari backend
+  // --- LOGIKA MANAJEMEN RUANGAN ---
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+    if (file) setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleAddRoom = async () => {
+    if (!newRoom.name || !newRoom.capacity || !selectedFile) return toast.error("Lengkapi data ruangan & foto!");
+    const formData = new FormData();
+    formData.append("name", newRoom.name);
+    formData.append("capacity", newRoom.capacity);
+    formData.append("image", selectedFile);
+
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+      await axios.post(`${API}/api/rooms`, formData, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
+      });
+      toast.success("Ruangan berhasil ditambah!");
+      setNewRoom({ name: "", capacity: "" });
+      setPreviewUrl(null);
+      setSelectedFile(null);
+      fetchRooms();
+    } catch (err) { toast.error("Gagal menambah ruangan"); }
+    finally { setIsLoading(false); }
+  };
+
+  const handleDeleteRoom = async (id: number) => {
+    // Pastikan ID ada
+    if (!id) return toast.error("ID Ruangan tidak ditemukan");
+
+    if (!confirm("Apakah Anda yakin ingin menghapus ruangan ini? Semua data booking terkait mungkin akan terpengaruh.")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Sesi habis, silakan login ulang");
+        return;
+      }
+
+      // Menggunakan axios.delete
+      const res = await axios.delete(`${API}/api/rooms/${id}`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+
+      if (res.status === 200 || res.status === 204) {
+        toast.success("Ruangan berhasil dihapus!");
+        fetchRooms(); // Refresh daftar ruangan
+      }
+    } catch (err: any) {
+      console.error("Delete Error:", err.response?.data || err.message);
+      toast.error(err.response?.data?.message || "Gagal hapus ruangan");
+    }
+  };
+
+  const handleUpdateRoom = async () => {
+    const formData = new FormData();
+    formData.append("name", editingRoomData.name);
+    formData.append("capacity", editingRoomData.capacity);
+    if (selectedFile) formData.append("image", selectedFile);
+
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+      await axios.put(`${API}/api/rooms/${editingRoomData.id}`, formData, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
+      });
+      toast.success("Berhasil diperbarui!");
+      setIsEditingRoom(false);
+      setSelectedFile(null);
+      fetchRooms();
+    } catch (err) { toast.error("Gagal update"); }
+    finally { setIsLoading(false); }
+  };
+
+  // --- LOGIKA BOOKING ---
   const handleShowInfo = async (roomName: string) => {
     if (!selectedDate) {
       toast.error("⚠️ Silakan pilih tanggal terlebih dahulu di form!");
       return;
     }
-
     try {
       const res = await fetch(`${API}/api/check-availability`, {
         method: "POST",
@@ -65,9 +163,7 @@ export default function BookingTab({
         body: JSON.stringify({ room: roomName, date: selectedDate }),
       });
       const data = await res.json();
-      
-      // Mengambil properti 'booked' yang berisi daftar peminjam (pastikan backend mengirim ini)
-      setDetails(data.booked || []); 
+      setDetails(data.booked || []);
       setModalRoomName(roomName);
       setShowModal(true);
     } catch (err) {
@@ -83,10 +179,9 @@ export default function BookingTab({
     endTime: timeEnd || null,
     pic: pic || null,
     unitKerja: unitKerja || null,
-    agenda: agenda || null, // 🔹 Tambahkan agenda ke data kirim
+    agenda: agenda || null,
   };
 
-  // Helpers time
   const parseToMinutes = (t: string) => {
     const [hh, mm] = t.split(":").map(Number);
     return hh * 60 + mm;
@@ -97,102 +192,9 @@ export default function BookingTab({
     return `${hh}:${mm}`;
   };
 
-  
-
-  // 1. Fetch data user (Role) & Data Ruangan dari DB
-  useEffect(() => {
-    const fetchData = async () => {
-      const token = localStorage.getItem("token");
-      
-      // Ambil data user
-      if (token) {
-        try {
-          const resUser = await fetch(`${API}/api/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (resUser.ok) {
-            const data = await resUser.json();
-            setUserRole(data.role); // 🔹 Simpan role ke state
-            if (data.username) setPic(data.username);
-            if (data.unitKerja) setUnitKerja(data.unitKerja);
-          }
-        } catch (err) { console.error(err); }
-      }
-
-      // Ambil status ruangan dari DB
-      try {
-        const resRooms = await fetch(`${API}/api/rooms`);
-        if (!resRooms.ok) throw new Error("Server error");
-          
-        const data = await resRooms.json();
-        setRoomsData(Array.isArray(data) ? data : []); // ✅ Selalu pastikan Array
-      } 
-      catch (err) {
-        console.error(err);
-        setRoomsData([]); // ✅ Cegah crash jika server 500
-      }
-    };
-    
-    fetchData();
-  }, []);
-
-  // Ambil nama ruangan yang sedang dipilih untuk keperluan form
-  const selectedRoomObject = roomsData.find((r) => r.id === selected);
-
-  // 2. Fungsi Toggle Admin
-  const toggleRoom = async (id: number) => {
-    try {
-      const res = await fetch(`${API}/api/rooms/${id}/toggle`, { method: "PATCH" });
-      if (res.ok) {
-        setRoomsData(prev => prev.map(r => r.id === id ? { ...r, isActive: !r.isActive } : r));
-        toast.success("Status ruangan diperbarui!");
-      }
-    } catch (err) { toast.error("Gagal update status"); }
-  };
-
-  // Ambil user (PIC & Unit Kerja)
-  useEffect(() => {
-    const fetchUser = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-      try {
-        const res = await fetch(`${API}/api/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.username) setPic(data.username);
-          if (data.unitKerja) setUnitKerja(data.unitKerja);
-        }
-      } catch (err) {
-        console.error("❌ Error fetch user:", err);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  // Isi form kalau sedang edit
-  useEffect(() => {
-    if (editingBooking && roomsData.length > 0) {
-      // Cari berdasarkan nama di data yang berasal dari Database
-      const room = roomsData.find((r) => r.name === editingBooking.room);
-      if (room) setSelected(room.id);
-      
-      setSelectedDate(editingBooking.date || "");
-      setTimeStart(editingBooking.startTime || "");
-      setTimeEnd(editingBooking.endTime || "");
-      setPic(editingBooking.pic || "");
-      setUnitKerja(editingBooking.unitKerja || "");
-      setAgenda(editingBooking.agenda || "");
-    }
-  }, [editingBooking, roomsData]); // Tambahkan roomsData di sini
-
-  // --- Fetch Availability Logic ---
   useEffect(() => {
     const fetchAvailability = async () => {
-      // Cari nama ruangan berdasarkan ID yang dipilih dari roomsData
       const selectedRoomName = roomsData.find(r => r.id === selected)?.name;
-
       if (selectedRoomName && selectedDate) {
         try {
           const res = await fetch(`${API}/api/check-availability`, {
@@ -200,46 +202,24 @@ export default function BookingTab({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ room: selectedRoomName, date: selectedDate }),
           });
-          
           if (!res.ok) { setAvailability([]); return; }
-          
           const data = await res.json();
-          let slots: AvailabilitySlot[] = Array.isArray(data.available) ? data.available : [];
-
-          // Logika penggabungan untuk mode EDIT
-          if (editingBooking && editingBooking.startTime && editingBooking.endTime && editingBooking.room === selectedRoomName) {
-            slots.push({ startTime: editingBooking.startTime, endTime: editingBooking.endTime });
-            slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
-            
-            const merged: AvailabilitySlot[] = [];
-            for (const s of slots) {
-              if (!merged.length) merged.push(s);
-              else {
-                const last = merged[merged.length - 1];
-                if (last.endTime === s.startTime) last.endTime = s.endTime;
-                else merged.push(s);
-              }
-            }
-            slots = merged;
-          }
-          
-          setAvailability(slots.sort((a, b) => a.startTime.localeCompare(b.startTime)));
+          let slots = Array.isArray(data.available) ? data.available : [];
+          setAvailability(slots.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime)));
         } catch (err) {
-          console.error("❌ Error fetch availability:", err);
           setAvailability([]);
         }
-      } else { 
-        setAvailability([]); 
+      } else {
+        setAvailability([]);
       }
     };
     fetchAvailability();
-    // Tambahkan roomsData ke dependency agar saat data DB datang, slot langsung muncul
-  }, [selected, selectedDate, roomsData, editingBooking]);
+  }, [selected, selectedDate, roomsData]);
 
-  const generateStartOptions = (): string[] => {
+  const generateStartOptions = () => {
     if (!availability.length) return [];
     const options: string[] = [];
-    availability.forEach((slot: AvailabilitySlot) => {
+    availability.forEach((slot) => {
       let current = parseToMinutes(slot.startTime);
       const end = parseToMinutes(slot.endTime);
       while (current < end) { options.push(formatFromMinutes(current)); current += 30; }
@@ -247,7 +227,7 @@ export default function BookingTab({
     return Array.from(new Set(options)).sort();
   };
 
-  const generateEndOptions = (): string[] => {
+  const generateEndOptions = () => {
     if (!timeStart || !availability.length) return [];
     const startMin = parseToMinutes(timeStart);
     const slot = availability.find((s) => startMin >= parseToMinutes(s.startTime) && startMin < parseToMinutes(s.endTime));
@@ -258,25 +238,9 @@ export default function BookingTab({
     return options;
   };
 
-  useEffect(() => {
-    const starts = generateStartOptions();
-    if (timeStart && !starts.includes(timeStart)) { setTimeStart(""); setTimeEnd(""); }
-  }, [availability]);
-
-  useEffect(() => {
-    if (!timeStart) return;
-    const ends = generateEndOptions();
-    if (timeEnd && !ends.includes(timeEnd)) setTimeEnd("");
-  }, [timeStart, availability]);
-
   const handleSubmit = async () => {
-    // 🔹 Tambahkan validasi agenda
-    if (!bookingData.room || !bookingData.date || !bookingData.startTime || !bookingData.endTime || !bookingData.pic || !bookingData.unitKerja || !bookingData.agenda) {
-      alert("⚠️ Mohon lengkapi semua data termasuk Agenda Kegiatan!");
-      return;
-    }
-    if (parseToMinutes(bookingData.endTime) <= parseToMinutes(bookingData.startTime)) {
-      alert("⚠️ Jam selesai harus lebih besar dari jam mulai!");
+    if (!bookingData.room || !bookingData.date || !bookingData.startTime || !bookingData.endTime || !bookingData.agenda) {
+      toast.error("⚠️ Mohon lengkapi semua data!");
       return;
     }
     try {
@@ -286,185 +250,248 @@ export default function BookingTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bookingData),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) throw new Error(data.message || "Gagal simpan booking");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
       
-      const updatedBooking = { ...bookingData, id: data.id || bookingData.id };
-      if (editingBooking && onFinishEdit) {
-        onFinishEdit(updatedBooking);
-        alert("✅ Booking berhasil diperbarui!");
-      } else {
-        setHistory((prev) => [...prev, updatedBooking]);
-        alert("✅ Booking baru berhasil disimpan!");
-        // 🔹 Reset form termasuk agenda
-        setSelected(null); setSelectedDate(""); setTimeStart(""); setTimeEnd(""); setAgenda("");
-      }
+      toast.success("✅ Booking berhasil disimpan!");
+      setSelected(null); setSelectedDate(""); setTimeStart(""); setTimeEnd(""); setAgenda("");
+      if (editingBooking && onFinishEdit) onFinishEdit(data);
     } catch (err: any) {
-      toast.error(`❌ Error: ${err.message || ""}`, { style: { background: "#fee2e2", color: "#b91c1c", fontWeight: "600" } });
+      toast.error(`❌ Error: ${err.message}`);
     }
   };
-
-  const startOptions = generateStartOptions();
-  const endOptions = generateEndOptions();
 
   return (
     <div className="min-h-screen text-black font-bold bg-white pt-0 px-0">
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Ruangan */}
-<div className="flex-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {roomsData.map((room) => {
-              const isDisabled = !room.isActive;
-              const isSelected = selected === room.id;
-
-              return (
-                <div key={room.id} className={`w-full border-2 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${isSelected ? "border-blue-600 shadow-xl ring-2 ring-blue-100" : "border-gray-200 shadow-sm"}`}>
-                  
-                  {/* 🔹 BAGIAN GAMBAR DINAMIS 🔹 */}
-                  <div className="relative h-44 w-full bg-gray-100">
-                    <img 
-                      // Mengambil path gambar dari DB, jika kosong pakai default
-                      src={room.imageUrl ? `${API}${room.imageUrl}` : "/assets/default-room.jpg"} 
-                      alt={room.name} 
-                      className={`w-full h-full object-cover transition-all duration-500 ${isDisabled ? "grayscale opacity-40" : ""}`}
-                      onError={(e) => { (e.target as HTMLImageElement).src = "/assets/default-room.jpg" }}
-                    />
-                    {isDisabled && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="bg-red-600 text-white text-[10px] px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg">Sedang Maintenance</span>
-                      </div>
-                    )}
+        
+        {/* KOLOM KIRI: DAFTAR RUANGAN */}
+        <div className="flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {roomsData.map((room) => (
+              <div key={room.id} 
+                className={`relative border-2 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${selected === room.id ? "border-blue-600 shadow-xl ring-2 ring-blue-100" : "border-gray-200 shadow-sm"}`}>
+                
+                {/* Admin Controls */}
+                {userRole === "admin" && (
+                  <div className="absolute top-2 right-2 z-10 flex gap-1">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation(); // <--- PENTING: Mencegah card terpilih
+                        setEditingRoomData(room); 
+                        setIsEditingRoom(true); 
+                        setPreviewUrl(`${API}${room.imageUrl}`);
+                      }}
+                      className="p-2 !bg-white border border-gray-200 shadow-sm rounded-full text-blue-600 hover:!bg-blue-600 hover:!text-white transition"
+                    >
+                      <Edit size={14} />
+                    </button>
+    
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation(); // <--- PENTING: Mencegah card terpilih
+                        handleDeleteRoom(room.id);
+                      }}
+                      className="p-2 !bg-white border border-gray-200 shadow-sm rounded-full text-red-600 hover:!bg-red-600 hover:!text-white transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
+                )}
 
-                  <div className="p-4 flex flex-col flex-grow bg-white">
-                    <div className="flex justify-between items-start mb-1">
-                      <h3 className={`text-lg leading-tight ${isDisabled ? "text-gray-400" : "text-gray-800"}`}>{room.name}</h3>
-                      <div className="flex items-center group relative">
-                  {/* Teks kecil yang muncul di sebelah kiri ikon saat hover */}
-                  {!isDisabled && (
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute right-10 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-md whitespace-nowrap pointer-events-none font-medium">
-                      Info detail peminjam
-                    </span>
-                  )}
+                <div className="h-44 w-full bg-gray-100">
+                  <img 
+                    src={room.imageUrl ? `${API}${room.imageUrl}` : "/assets/default-room.jpg"} 
+                    alt={room.name} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
 
+                <div className="p-4 flex flex-col flex-grow bg-white">
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="text-lg leading-tight text-black">{room.name}</h3>
+                    <button 
+                      onClick={() => handleShowInfo(room.name)} 
+                      title="Info detail peminjam" // <--- Tambahkan ini
+                      className="p-1.5 bg-blue-50 text-blue-400 rounded-full hover:bg-blue-600 hover:text-white transition shadow-sm"
+                    >
+                      <Info size={18} />
+                    </button>
+                  </div>
+                  <p className="text-xs font-normal text-gray-500 mb-4 italic">Kapasitas: {room.capacity}</p>
                   <button 
-                    onClick={() => handleShowInfo(room.name)}
-                    className={`p-1.5 rounded-full transition-all duration-300 active:scale-95 ${
-                      isDisabled 
-                        ? "text-gray-300 cursor-not-allowed" 
-                        : "bg-blue-50 text-blue-400 hover:bg-blue-600 hover:text-white shadow-sm"
-                    }`}
-                    disabled={isDisabled}
+                    onClick={() => setSelected(room.id)} 
+                    className={`w-full py-2.5 rounded-xl font-bold transition-all active:scale-95 ${selected === room.id ? "bg-blue-600 text-white shadow-lg" : "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"}`}
                   >
-                    <Info size={20} strokeWidth={2.5} />
+                    {selected === room.id ? "Terpilih" : "Pilih Ruangan"}
                   </button>
                 </div>
-                    </div>
-                    <p className="text-xs font-normal text-gray-500 mb-4 italic">Kapasitas: {room.capacity}</p>
-
-                    <div className="mt-auto space-y-2">
-                      {userRole === "admin" && (
-                        <button 
-                          onClick={() => toggleRoom(room.id)}
-                          className={`w-full py-1.5 text-[10px] rounded-lg border uppercase font-bold transition ${room.isActive ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-600 hover:text-white" : "bg-green-600 text-white border-green-600"}`}
-                        >
-                          {room.isActive ? "Matikan Akses" : "Aktifkan Akses"}
-                        </button>
-                      )}
-
-                      <button 
-                        disabled={isDisabled}
-                        onClick={() => setSelected(room.id)} 
-                        className={`w-full py-2.5 rounded-xl font-bold transition-all active:scale-95 ${isDisabled ? "bg-gray-200 text-gray-400 cursor-not-allowed" : isSelected ? "bg-blue-600 text-white shadow-lg" : "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"}`}
-                      >
-                        {isDisabled ? "Terkunci" : isSelected ? "Terpilih" : "Pilih Ruangan"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
+
+          {/* FITUR TAMBAH RUANGAN (ADMIN) */}
+          {userRole === "admin" && (
+            <div className="mt-12 p-6 border-2 border-dashed border-gray-200 rounded-3xl bg-white">
+              <h3 className="text-black uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
+                <Plus size={16} /> Tambah Ruangan Baru
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input 
+                  type="text" placeholder="Nama Ruangan" 
+                  className="p-3 border rounded-xl font-normal bg-white"
+                  value={newRoom.name} onChange={e => setNewRoom({...newRoom, name: e.target.value})}
+                />
+                <input 
+                  type="text" placeholder="Kapasitas (contoh: 20 Orang)" 
+                  className="p-3 border rounded-xl font-normal bg-white"
+                  value={newRoom.capacity} onChange={e => setNewRoom({...newRoom, capacity: e.target.value})}
+                />
+                <div className="relative border rounded-xl bg-white p-3 flex items-center justify-between">
+                   <span className="text-xs text-gray-400 truncate">{selectedFile ? selectedFile.name : "Pilih Foto..."}</span>
+                   <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
+                   <ImageIcon size={18} className="text-gray-400" />
+                </div>
+              </div>
+              <button 
+                onClick={handleAddRoom} 
+                disabled={isLoading}
+                className="mt-4 w-full md:w-auto px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-800 text-white font-bold transition active:scale-95 shadow-lg disabled:bg-gray-300"
+              >
+                {isLoading ? "Proses..." : "Simpan Ruangan"}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Form */}
-        <div className="w-full lg:w-[350px] p-4 border rounded-lg shadow-md bg-white h-fit lg:ml-auto">
+        {/* KOLOM KANAN: FORM BOOKING */}
+        <div className="w-full lg:w-[350px] p-4 border rounded-lg shadow-md bg-white h-fit lg:sticky lg:top-4">
           <div className="mb-4">
             <label className="block text-sm mb-1 font-bold">Tanggal Pemakaian</label>
             <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 font-normal bg-white" />
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm mb-1 font-bold">Jam Kosong Ruangan</label>
-            <div className="w-full border rounded-lg px-3 py-2 bg-gray-100 text-gray-700 font-normal min-h-[50px]">
+            <label className="block text-sm mb-1 font-bold">Jam Kosong</label>
+            <div className="w-full border rounded-lg px-3 py-2 bg-gray-50 text-gray-700 font-normal min-h-[50px]">
               {availability.length > 0 ? (
-                <ul className="list-disc list-inside text-sm">
-                  {availability.map((slot, idx) => <li key={idx}>{slot.startTime} - {slot.endTime}</li>)}
+                <ul className="text-sm">
+                  {availability.map((slot, idx) => <li key={idx} className="flex justify-between border-b last:border-0 py-1"><span>{slot.startTime} - {slot.endTime}</span></li>)}
                 </ul>
-              ) : <span className="text-gray-500 text-sm">{bookingData.room && bookingData.date ? "Tidak ada slot kosong" : "(Pilih ruangan & tanggal dulu)"}</span>}
+              ) : <span className="text-gray-400 text-xs italic">(Pilih ruangan & tanggal)</span>}
             </div>
           </div>
 
           <div className="mb-4">
             <label className="block text-sm mb-1 font-bold">Waktu Pemakaian</label>
             <div className="flex items-center gap-2">
-              <select value={timeStart} onChange={(e) => { setTimeStart(e.target.value); setTimeEnd(""); }} className="w-1/2 border rounded-lg px-3 py-2 font-normal bg-white">
-                <option value="">Pilih</option>
-                {startOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+              <select value={timeStart} onChange={(e) => { setTimeStart(e.target.value); setTimeEnd(""); }} className="w-1/2 border rounded-lg px-3 py-2 font-normal bg-white text-sm">
+                <option value="">Mulai</option>
+                {generateStartOptions().map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
               <span>-</span>
-              <select value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} className="w-1/2 border rounded-lg px-3 py-2 font-normal bg-white" disabled={!timeStart || endOptions.length === 0}>
-                <option value="">Pilih</option>
-                {endOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+              <select value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)} className="w-1/2 border rounded-lg px-3 py-2 font-normal bg-white text-sm" disabled={!timeStart}>
+                <option value="">Selesai</option>
+                {generateEndOptions().map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
           </div>
 
-          {/* 🔹 Input Agenda Kegiatan */}
           <div className="mb-4">
             <label className="block text-sm mb-1 font-bold">Agenda Kegiatan</label>
             <textarea
               value={agenda}
               onChange={(e) => setAgenda(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 font-normal bg-white h-24 resize-none"
-              placeholder="Contoh: Rapat Koordinasi internal..."
+              className="w-full border rounded-lg px-3 py-2 font-normal bg-white h-24 resize-none text-sm"
+              placeholder="Contoh: Rapat Koordinasi..."
             />
           </div>
 
-          <button onClick={handleSubmit} className="w-full py-3 rounded-full bg-blue-600 hover:bg-blue-800 text-white font-semibold transition active:scale-95">
+          <button onClick={handleSubmit} className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-800 text-white font-bold transition active:scale-95 shadow-lg">
             {editingBooking ? "Simpan Perubahan" : "Kirim Pengajuan"}
           </button>
-
-          <div className="mt-4"><Toaster position="top-center" /></div>
+          <Toaster position="top-center" />
         </div>
       </div>
-      {/* 🔹 POP UP TABEL DETAIL PEMINJAM */}
+
+      {/* MODAL EDIT RUANGAN (POPUP) */}
+      {isEditingRoom && editingRoomData && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">Edit Ruangan</h2>
+              <button 
+                onClick={() => setIsEditingRoom(false)} 
+                className="p-2 !bg-white border border-gray-200 !text-gray-500 rounded-xl hover:!bg-gray-50 transition-all shadow-sm"
+              >
+                <X /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block font-bold">Nama Ruangan</label>
+                {/* Memastikan background putih bersih dan border halus */}
+                <input 
+                  className="w-full p-3 border border-gray-200 rounded-xl font-normal bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" 
+                  value={editingRoomData.name} 
+                  onChange={e => setEditingRoomData({...editingRoomData, name: e.target.value})} 
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block font-bold">Kapasitas</label>
+                <input 
+                  className="w-full p-3 border border-gray-200 rounded-xl font-normal bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" 
+                  value={editingRoomData.capacity} 
+                  onChange={e => setEditingRoomData({...editingRoomData, capacity: e.target.value})} 
+                />
+              </div>
+
+              {/* Area Upload/Preview Foto */}
+              <div className="relative border-2 border-dashed border-gray-100 rounded-xl p-4 text-center bg-white hover:border-blue-300 transition-colors">
+                {previewUrl ? (
+                  <img src={previewUrl} className="h-32 mx-auto rounded-lg mb-2 object-cover shadow-sm" />
+                ) : (
+                  <ImageIcon size={30} className="mx-auto text-gray-300 mb-2" />
+                )}
+                <p className="text-[10px] text-gray-400 font-normal">Klik untuk ganti foto</p>
+                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
+              </div>
+
+              <button 
+                onClick={handleUpdateRoom} 
+                disabled={isLoading} 
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition active:scale-[0.98] shadow-lg disabled:bg-gray-300"
+              >
+                {isLoading ? "Menyimpan..." : "Update Ruangan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL INFO PEMINJAM */}
       {showModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
             <div className="p-4 border-b flex justify-between items-center bg-blue-50 rounded-t-2xl">
               <div>
-                <h3 className="text-lg font-bold text-blue-900">Daftar Peminjam: {modalRoomName}</h3>
-                <p className="text-xs font-normal text-gray-600">Tanggal: {selectedDate}</p>
+                <h3 className="text-lg font-bold text-blue-900">Peminjam: {modalRoomName}</h3>
+                <p className="text-xs font-normal text-gray-600">{selectedDate}</p>
               </div>
               <button 
                 onClick={() => setShowModal(false)} 
-                className="bg-transparent text-blue-900 hover:text-red-500 transition-colors p-1">
+                className="text-blue-900 hover:text-red-500 transition-colors p-1"
+              >
                 <X size={24} />
               </button>
             </div>
-            
             <div className="p-4 overflow-auto">
               {details.length > 0 ? (
                 <div className="overflow-x-auto border rounded-lg">
                   <table className="w-full text-left text-sm font-normal">
                     <thead className="bg-gray-100 font-bold border-b text-gray-700">
-                      <tr>
-                        <th className="p-3">Waktu</th>
-                        <th className="p-3">PIC</th>
-                        <th className="p-3">Unit Kerja</th>
-                        <th className="p-3">Agenda</th>
-                      </tr>
+                      <tr><th className="p-3">Waktu</th><th className="p-3">PIC</th><th className="p-3">Unit Kerja</th><th className="p-3">Agenda</th></tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {details.map((d, i) => (
@@ -478,17 +505,10 @@ export default function BookingTab({
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div className="text-center py-12 text-gray-400 font-normal">
-                  Belum ada peminjaman pada tanggal ini.
-                </div>
-              )}
+              ) : <div className="text-center py-12 text-gray-400 font-normal">Belum ada peminjaman.</div>}
             </div>
-            
             <div className="p-4 border-t text-right">
-              <button onClick={() => setShowModal(false)} className="px-6 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition shadow-md">
-                Tutup
-              </button>
+              <button onClick={() => setShowModal(false)} className="px-6 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition shadow-md font-bold">Tutup</button>
             </div>
           </div>
         </div>
