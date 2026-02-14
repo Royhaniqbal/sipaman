@@ -323,21 +323,17 @@ app.delete("/api/rooms/:id", isAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // 1. Cari dulu ruangannya
     const room = await Room.findByPk(id);
     if (!room) {
       return res.status(404).json({ success: false, message: "Ruangan tidak ditemukan" });
     }
 
-    // 2. (Opsional) Hapus file gambar dari folder uploads agar tidak menumpuk
     if (room.imageUrl) {
       const filePath = path.join(process.cwd(), room.imageUrl);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     }
-
-    // 3. Hapus data dari database
     await room.destroy();
 
     res.json({ success: true, message: "Ruangan berhasil dihapus" });
