@@ -403,6 +403,7 @@ const handleSubmit = async () => {
                         e.stopPropagation(); // <--- PENTING: Mencegah card terpilih
                         setEditingRoomData(room); 
                         setIsEditingRoom(true); 
+                        setSelectedFile(null);
                         setPreviewUrl(`${API}${room.imageUrl}`);
                       }}
                       className="p-2 !bg-white border border-gray-200 shadow-sm rounded-full text-blue-600 hover:!bg-blue-600 hover:!text-white transition"

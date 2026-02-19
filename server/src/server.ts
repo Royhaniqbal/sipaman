@@ -350,7 +350,10 @@ app.put("/api/rooms/:id", isAdmin, upload.single("image"), async (req: Request, 
     const { name, capacity } = req.body;
     const room = await Room.findByPk(id);
 
-    if (!room) return res.status(404).json({ success: false, message: "Ruangan tidak ditemukan" });
+    if (!room) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ success: false, message: "Ruangan tidak ditemukan" });
+    }
 
     // Jika ada file baru, hapus foto lama (opsional)
     let imageUrl = room.imageUrl;
@@ -362,10 +365,18 @@ app.put("/api/rooms/:id", isAdmin, upload.single("image"), async (req: Request, 
       imageUrl = `/uploads/${req.file.filename}`;
     }
 
-    await room.update({ name, capacity, imageUrl });
+    // await room.update({ name, capacity, imageUrl });
+    await room.update({ 
+      name: name || room.name, 
+      capacity: capacity || room.capacity, 
+      imageUrl 
+    });
 
     res.json({ success: true, message: "Ruangan berhasil diperbarui" });
   } catch (error) {
+    console.error("❌ Error update room:", error);
+    // Cleanup: jika error saat proses DB tapi file sudah terlanjur upload, hapus file baru tersebut
+    if (req.file) fs.unlinkSync(req.file.path);
     res.status(500).json({ success: false, message: "Gagal update ruangan" });
   }
 });
