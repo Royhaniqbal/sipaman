@@ -8,6 +8,7 @@ class Booking extends Model {
   public startTime!: string;
   public endTime!: string;
   public pic!: string;
+  public phone!: string | null;
   public unitKerja!: string;
   public agenda!: string;
 }

@@ -39,11 +39,15 @@ router.post("/register", async (req, res) => {
   const { username, email, password, role, unitKerja, phone } = req.body;
 
   try {
-    // 🔹 PROTEKSI ADMIN: Hanya boleh ada 1
     if (role === "admin") {
-      const adminExists = await User.findOne({ where: { role: "admin" } });
-      if (adminExists) {
-        return res.status(400).json({ message: "Silahkan daftar sebagai User" });
+      // Hitung berapa jumlah admin yang sudah terdaftar di database
+      const adminCount = await User.count({ where: { role: "admin" } });
+      
+      // Jika sudah mencapai 2, maka tolak pendaftaran admin baru
+      if (adminCount >= 2) {
+        return res.status(400).json({ 
+          message: "Silahkan daftar sebagai User." 
+        });
       }
     }
 

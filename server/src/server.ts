@@ -125,7 +125,7 @@ app.post("/api/check-availability", async (req: Request, res: Response) => {
 app.post("/api/book", async (req: Request, res: Response) => {
   const { room, date, startTime, endTime, pic, unitKerja, agenda, phone } = req.body;
 
-  if (!room || !date || !startTime || !endTime || !pic || !unitKerja || !agenda || !phone) {
+  if (!room || !date || !startTime || !endTime || !pic || !unitKerja || !agenda) {
     return res.status(400).json({ success: false, message: "Data tidak lengkap" });
   }
 

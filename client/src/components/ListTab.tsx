@@ -20,6 +20,7 @@ type ListTabProps = {
 
 export default function ListTab({ history, setHistory }: ListTabProps) {
   const [editingBooking, setEditingBooking] = useState<BookingData | null>(null);
+  const [loadingIndex, setLoadingIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchBookings = async () => {
@@ -50,7 +51,7 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
     );
 
     if (!confirmCancel) return;
-
+    setLoadingIndex(index);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/cancel-booking`, {
         method: "POST",
@@ -66,6 +67,9 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
     } catch (error) {
       console.error("❌ Error cancel booking:", error);
       alert("❌ Terjadi kesalahan saat koneksi ke server");
+    }
+    finally {
+      setLoadingIndex(null); // 👈 Selesai loading
     }
   };
 
@@ -123,26 +127,47 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
               <p className={`text-sm font-bold ${past ? "text-gray-400" : "text-gray-700"}`}>"{item.agenda || "-"}"</p>
             </div>
 
-              <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto mt-4 md:mt-0 border-t md:border-t-0 pt-4 md:pt-0">
-                {!past ? (
-                  <>
-                    <button
-                      onClick={() => setEditingBooking(item)}
-                      className="flex-1 px-4 py-2 text-xs rounded-xl bg-blue-50 text-blue-600 font-bold hover:bg-blue-600 hover:text-white transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleCancel(idx)}
-                      className="flex-1 px-4 py-2 text-xs rounded-xl bg-red-50 text-red-600 font-bold hover:bg-red-600 hover:text-white transition-colors"
-                    >
-                      Batal
-                    </button>
-                  </>
-                ) : (
-                  <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-3 py-1 rounded-full uppercase text-center">Selesai</span>
-                )}
-              </div>
+            <div className="flex flex-row md:flex-col gap-2 w-full md:w-32 mt-4 md:mt-0 border-t md:border-t-0 pt-4 md:pt-0">
+              {!past ? (
+                <>
+                  {/* TOMBOL EDIT */}
+                  <button
+                    onClick={() => setEditingBooking(item)}
+                    disabled={loadingIndex !== null}
+                    className="flex-1 w-full py-2.5 text-xs rounded-xl font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100"
+                  >
+                    Edit
+                  </button>
+
+                  {/* TOMBOL BATAL / MEMPROSES */}
+                  <button
+                    onClick={() => handleCancel(idx)}
+                    disabled={loadingIndex !== null}
+                    className={`flex-1 w-full py-2.5 text-xs rounded-xl font-bold transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 ${
+                      loadingIndex === idx
+                        ? "bg-gray-100 text-gray-500 cursor-wait border border-gray-200"
+                        : "bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-100"
+                    }`}
+                  >
+                    {loadingIndex === idx ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Memproses...</span>
+                      </>
+                    ) : (
+                      "Batal"
+                    )}
+                  </button>
+                </>
+              ) : (
+                <span className="w-full py-2 text-[10px] font-bold text-gray-400 bg-gray-100 rounded-full uppercase text-center border border-gray-200">
+                  Selesai
+                </span>
+              )}
+            </div>
             </div>
           );
         })}

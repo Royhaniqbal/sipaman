@@ -1,7 +1,7 @@
 // src/components/BookingTab.tsx
 import { useState, useEffect } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { Info, X, Plus, Trash2, Edit, Image as ImageIcon } from "lucide-react";
+import { Info, X, Plus, Trash2, Edit, Image as ImageIcon, Check } from "lucide-react";
 import axios from "axios";
 
 type AvailabilitySlot = { startTime: string; endTime: string };
@@ -215,6 +215,43 @@ export default function BookingTab({
           if (!res.ok) { setAvailability([]); return; }
           const data = await res.json();
           let slots = Array.isArray(data.available) ? data.available : [];
+
+          // --- LOGIKA TAMBAHAN UNTUK EDIT ---
+          // Jika sedang mode edit dan ruangan/tanggal sama dengan data asli
+          if (editingBooking && 
+              selectedRoomName === editingBooking.room && 
+              selectedDate === editingBooking.date) {
+            
+            // Tambahkan slot waktu asli booking ini ke dalam daftar slot kosong
+            slots.push({ 
+              startTime: editingBooking.startTime, 
+              endTime: editingBooking.endTime 
+            });
+
+            // Gabungkan slot yang bersentuhan (overlap) agar pilihan jam tidak terputus
+            slots.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
+            
+            const mergedSlots: AvailabilitySlot[] = [];
+            if (slots.length > 0) {
+              let current = slots[0];
+              for (let i = 1; i < slots.length; i++) {
+                // Jika slot saat ini menyambung dengan slot berikutnya
+                if (current.endTime >= slots[i].startTime) {
+                  current = {
+                    startTime: current.startTime,
+                    endTime: slots[i].endTime > current.endTime ? slots[i].endTime : current.endTime
+                  };
+                } else {
+                  mergedSlots.push(current);
+                  current = slots[i];
+                }
+              }
+              mergedSlots.push(current);
+            }
+            slots = mergedSlots;
+          }
+          // ----------------------------------
+
           setAvailability(slots.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime)));
         } catch (err) {
           setAvailability([]);
@@ -224,7 +261,28 @@ export default function BookingTab({
       }
     };
     fetchAvailability();
-  }, [selected, selectedDate, roomsData]);
+  }, [selected, selectedDate, roomsData, editingBooking]); // Tambahkan editingBooking di dependency
+
+  useEffect(() => {
+    if (editingBooking && roomsData.length > 0) {
+      // 1. Cari ID ruangan berdasarkan nama yang ada di data booking
+      const room = roomsData.find((r) => r.name === editingBooking.room);
+      if (room) {
+        setSelected(room.id);
+      }
+
+      // 2. Set state form dengan data yang akan diedit
+      setSelectedDate(editingBooking.date || "");
+      setTimeStart(editingBooking.startTime || "");
+      setTimeEnd(editingBooking.endTime || "");
+      setAgenda(editingBooking.agenda || "");
+      
+      // Jika data PIC/Unit/Phone ingin di-reset ke data booking yang diedit (opsional)
+      if (editingBooking.pic) setPic(editingBooking.pic);
+      if (editingBooking.unitKerja) setUnitKerja(editingBooking.unitKerja);
+      if (editingBooking.phone) setPhone(editingBooking.phone);
+    }
+  }, [editingBooking, roomsData]); // Berjalan saat data booking edit atau data ruangan tersedia
 
   const generateStartOptions = () => {
     if (!availability.length) return [];
@@ -248,11 +306,12 @@ export default function BookingTab({
     return options;
   };
 
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
     if (!bookingData.room || !bookingData.date || !bookingData.startTime || !bookingData.endTime || !bookingData.agenda) {
       toast.error("⚠️ Mohon lengkapi semua data!");
       return;
     }
+    setIsLoading(true);
     try {
       const endpoint = editingBooking ? `${API}/api/book/${bookingData.id}` : `${API}/api/book`;
       const res = await fetch(endpoint, {
@@ -262,16 +321,50 @@ export default function BookingTab({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      
-      toast.success("✅ Booking berhasil disimpan!");
+
+      // --- LOGIKA NOTIFIKASI ---
+      if (!editingBooking) {
+        // HANYA muncul jika ini pengajuan baru (bukan edit)
+        toast.custom((t) => (
+          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col items-center p-10 border-4 border-green-500`}>
+            <div className="bg-green-100 p-4 rounded-full mb-4">
+              {/* Logo diubah menjadi Check (Centang) */}
+              <Check className="text-green-600 scale-[2]" size={40} /> 
+            </div>
+            <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Pengajuan Berhasil</h1>
+            <p className="text-gray-500 font-normal mt-2">Data Anda telah tersimpan ke sistem.</p>
+          </div>
+        ), { duration: 3000, position: 'top-center' });
+      }
+
+      // Reset & Callback
       setSelected(null); 
       setSelectedDate(""); 
       setTimeStart(""); 
       setTimeEnd(""); 
       setAgenda("");
+      
+      // Jika mode edit, fungsi onFinishEdit akan langsung dipanggil tanpa toast
       if (editingBooking && onFinishEdit) onFinishEdit(data);
+      
     } catch (err: any) {
-      toast.error(`❌ Error: ${err.message}`);
+      // Notifikasi error tetap dimunculkan hanya untuk Pengajuan Baru agar user tahu kenapa gagal
+      if (!editingBooking) {
+        toast.custom((t) => (
+          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col items-center p-10 border-4 border-red-500`}>
+            <div className="bg-red-100 p-4 rounded-full mb-4">
+              <X className="text-red-600 scale-[2]" size={40} />
+            </div>
+            <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Pengajuan Gagal</h1>
+            <p className="text-gray-500 font-normal mt-2 text-center">{err.message}</p>
+          </div>
+        ), { duration: 4000, position: 'top-center' });
+      } else {
+        // Log error ke konsol saja jika saat edit terjadi kegagalan, atau biarkan kosong sesuai permintaan
+        console.error("Gagal update booking:", err.message);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -421,10 +514,35 @@ export default function BookingTab({
             />
           </div>
 
-          <button onClick={handleSubmit} className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-800 text-white font-bold transition active:scale-95 shadow-lg">
-            {editingBooking ? "Simpan Perubahan" : "Kirim Pengajuan"}
+          <button 
+            onClick={handleSubmit} 
+            disabled={isLoading}
+            className={`w-full py-3 rounded-xl font-bold transition active:scale-95 shadow-lg flex items-center justify-center gap-2 ${
+              isLoading ? "bg-gray-400 cursor-wait" : "bg-blue-600 hover:bg-blue-800 text-white"
+            }`}
+          >
+            {isLoading ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Memproses...</span>
+              </>
+            ) : (
+              editingBooking ? "Simpan Perubahan" : "Kirim Pengajuan"
+            )}
           </button>
-          <Toaster position="top-center" />
+          {/* <Toaster position="top-center" /> */}
+          <Toaster 
+            position="top-center" 
+            containerStyle={{
+              top: '30%', // Menggeser posisi "top" agak ke tengah layar
+            }}
+            toastOptions={{
+              duration: 3000,
+            }}
+          />
         </div>
       </div>
 
