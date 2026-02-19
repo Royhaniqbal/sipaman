@@ -102,7 +102,15 @@ export default function BookingTab({
       await axios.post(`${API}/api/rooms`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
       });
-      toast.success("Ruangan berhasil ditambah!");
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col items-center p-10 border-4 border-blue-500`}>
+          <div className="bg-blue-100 p-4 rounded-full mb-4">
+            <Plus className="text-blue-600 scale-[2]" size={40} /> 
+          </div>
+          <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter text-center">Ruangan Ditambah</h1>
+          <p className="text-gray-500 font-normal mt-2">Data ruangan baru telah berhasil disimpan.</p>
+        </div>
+      ), { duration: 3000, position: 'top-center' });
       setNewRoom({ name: "", capacity: "" });
       setPreviewUrl(null);
       setSelectedFile(null);
@@ -151,7 +159,15 @@ export default function BookingTab({
       await axios.put(`${API}/api/rooms/${editingRoomData.id}`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
       });
-      toast.success("Berhasil diperbarui!");
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col items-center p-10 border-4 border-orange-500`}>
+          <div className="bg-orange-100 p-4 rounded-full mb-4">
+            <Edit className="text-orange-600 scale-[2]" size={40} /> 
+          </div>
+          <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter text-center">Berhasil Diperbarui</h1>
+          <p className="text-gray-500 font-normal mt-2 text-center">Data perubahan ruangan telah disimpan.</p>
+        </div>
+      ), { duration: 3000, position: 'top-center' });
       setIsEditingRoom(false);
       setSelectedFile(null);
       fetchRooms();
