@@ -1,7 +1,7 @@
 // src/components/BookingTab.tsx
 import { useState, useEffect } from "react";
 import toast, { Toaster } from "react-hot-toast";
-import { Info, X, Plus, Trash2, Edit, Image as ImageIcon, Check } from "lucide-react";
+import { Info, X, Plus, Trash2, Edit, Image as ImageIcon, Check, Calendar } from "lucide-react";
 import axios from "axios";
 
 type AvailabilitySlot = { startTime: string; endTime: string };
@@ -201,9 +201,23 @@ export default function BookingTab({
   // --- LOGIKA BOOKING ---
   const handleShowInfo = async (roomName: string) => {
     if (!selectedDate) {
-      toast.error("⚠️ Silahkan pilih tanggal terlebih dahulu di form!");
+      // NOTIFIKASI CUSTOM BESAR DI TENGAH
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col items-center p-10 border-4 border-amber-500`}>
+          <div className="bg-amber-100 p-4 rounded-full mb-4">
+            <Calendar className="text-amber-600 scale-[2]" size={40} />
+          </div>
+          <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter text-center leading-tight">
+            Pilih Tanggal <br/> Terlebih Dahulu
+          </h1>
+          <p className="text-gray-500 font-normal mt-4 text-center">
+            Silahkan tentukan <span className="text-amber-600 font-bold">Tanggal Pemakaian</span> terlebih dahulu untuk melihat informasi pemakai ruangan.
+          </p>
+        </div>
+      ), { duration: 3000, position: 'top-center' });
       return;
     }
+
     try {
       const res = await fetch(`${API}/api/check-availability`, {
         method: "POST",
