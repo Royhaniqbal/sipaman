@@ -54,7 +54,8 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 connectDB().then(async () => {
   try {
     // alter: true akan memeriksa tabel dan menambahkan kolom yang kurang otomatis
-    await sequelize.sync({ alter: true });
+    // await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: false });
     console.log("✅ Database synced and columns updated!");
   } catch (err) {
     console.error("❌ Sync failed:", err);
@@ -63,33 +64,90 @@ connectDB().then(async () => {
 
 app.use("/api/auth", authRoutes);
 
-// ✅ Endpoint: Cek ketersediaan & Ambil Detail Peminjam
+// ✅ Endpoint: Cek ketersediaan & Ambil Detail Peminjam (code lama)
+// app.post("/api/check-availability", async (req: Request, res: Response) => {
+//   const { room, date } = req.body;
+//   const roomData = await Room.findOne({ where: { name: room } });
+//     if (roomData && !roomData.isActive) {
+//       return res.status(403).json({ 
+//         success: false, 
+//         message: "⚠️ Ruangan ini sedang tidak tersedia untuk dipinjam (Dinonaktifkan Admin)." 
+//       });
+//     }
+
+//   if (!room || !date) {
+//     return res.status(400).json({ error: "Room dan date wajib diisi" });
+//   }
+
+//   try {
+//     // 1. Ambil semua data booking untuk ruangan dan tanggal tersebut
+//     const roomBookings = await Booking.findAll({ 
+//       where: { room, date },
+//       order: [['startTime', 'ASC']] 
+//     });
+    
+//     // 2. Tentukan jam kerja operasional
+//     const WORKING_HOURS = [{ startTime: "07:30", endTime: "17:00" }];
+//     let availableSlots = [...WORKING_HOURS];
+
+//     // 3. Algoritma menghitung slot kosong
+//     roomBookings.forEach((booked: any) => {
+//       availableSlots = availableSlots.flatMap((slot) => {
+//         if (booked.startTime >= slot.endTime || booked.endTime <= slot.startTime) {
+//           return [slot];
+//         }
+//         const result: { startTime: string; endTime: string }[] = [];
+//         if (booked.startTime > slot.startTime) {
+//           result.push({ startTime: slot.startTime, endTime: booked.startTime });
+//         }
+//         if (booked.endTime < slot.endTime) {
+//           result.push({ startTime: booked.endTime, endTime: slot.endTime });
+//         }
+//         return result;
+//       });
+//     });
+
+//     // 4. Kirim respon tunggal yang berisi slot kosong DAN daftar peminjam
+//     return res.json({ 
+//       room, 
+//       date, 
+//       available: availableSlots, 
+//       booked: roomBookings // Data ini yang akan tampil di tabel pop-up Frontend
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error check-availability:", error);
+//     return res.status(500).json({ error: "Internal server error" });
+//   }
+// });
+
+// ✅ Endpoint: Cek ketersediaan & Ambil Detail Peminjam (code baru)
 app.post("/api/check-availability", async (req: Request, res: Response) => {
   const { room, date } = req.body;
-  const roomData = await Room.findOne({ where: { name: room } });
-    if (roomData && !roomData.isActive) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "⚠️ Ruangan ini sedang tidak tersedia untuk dipinjam (Dinonaktifkan Admin)." 
-      });
-    }
 
   if (!room || !date) {
     return res.status(400).json({ error: "Room dan date wajib diisi" });
   }
 
   try {
-    // 1. Ambil semua data booking untuk ruangan dan tanggal tersebut
+    const roomData = await Room.findOne({ where: { name: room } });
+    if (roomData && !roomData.isActive) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "⚠️ Ruangan ini sedang tidak tersedia (Dinonaktifkan Admin)." 
+      });
+    }
+
     const roomBookings = await Booking.findAll({ 
       where: { room, date },
       order: [['startTime', 'ASC']] 
     });
     
-    // 2. Tentukan jam kerja operasional
+    // Tentukan jam kerja operasional
     const WORKING_HOURS = [{ startTime: "07:30", endTime: "17:00" }];
     let availableSlots = [...WORKING_HOURS];
 
-    // 3. Algoritma menghitung slot kosong
+    // Algoritma menghitung slot kosong
     roomBookings.forEach((booked: any) => {
       availableSlots = availableSlots.flatMap((slot) => {
         if (booked.startTime >= slot.endTime || booked.endTime <= slot.startTime) {
@@ -106,12 +164,12 @@ app.post("/api/check-availability", async (req: Request, res: Response) => {
       });
     });
 
-    // 4. Kirim respon tunggal yang berisi slot kosong DAN daftar peminjam
+    // Jika availableSlots kosong [], maka di Frontend akan muncul "Full Booked"
     return res.json({ 
       room, 
       date, 
       available: availableSlots, 
-      booked: roomBookings // Data ini yang akan tampil di tabel pop-up Frontend
+      booked: roomBookings 
     });
 
   } catch (error) {
@@ -121,7 +179,6 @@ app.post("/api/check-availability", async (req: Request, res: Response) => {
 });
 
 // ✅ Endpoint: Buat booking baru
-// ✅ Endpoint: Buat booking baru
 app.post("/api/book", async (req: Request, res: Response) => {
   const { room, date, startTime, endTime, pic, unitKerja, agenda, phone } = req.body;
 
@@ -130,6 +187,20 @@ app.post("/api/book", async (req: Request, res: Response) => {
   }
 
   try {
+    // --- TAMBAHKAN VALIDASI INI ---
+    const roomData = await Room.findOne({ where: { name: room } });
+    if (!roomData) {
+      return res.status(404).json({ success: false, message: "⚠️ Ruangan tidak ditemukan" });
+    }
+
+    if (!roomData.isActive) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "⚠️ Ruangan ini sedang dinonaktifkan oleh admin dan tidak dapat dipinjam." 
+      });
+    }
+    // ------------------------------
+
     // 1. Cek Konflik
     const conflict = await Booking.findOne({
       where: {
@@ -268,7 +339,7 @@ app.get("/api/rooms", async (_req, res) => {
 });
 
 // ✅ Endpoint: Toggle Status Ruangan (KHUSUS ADMIN)
-app.patch("/api/rooms/:id/toggle", async (req, res) => {
+app.patch("/api/rooms/:id/toggle", isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const room = await Room.findByPk(id);

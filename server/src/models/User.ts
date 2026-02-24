@@ -25,7 +25,8 @@ User.init(
     email: { 
       type: DataTypes.STRING, 
       allowNull: false, 
-      unique: true,
+      // unique: true,
+      unique: "unique_email_index",
       validate: { isEmail: true }
     },
     password: { type: DataTypes.STRING, allowNull: false },

@@ -40,6 +40,7 @@ export default function BookingTab({
   const [showModal, setShowModal] = useState(false);
   const [details, setDetails] = useState<BookingDetail[]>([]);
   const [modalRoomName, setModalRoomName] = useState("");
+  const [fullBookedRooms, setFullBookedRooms] = useState<string[]>([]); //code baru
 
   // --- STATE MANAGEMENT RUANGAN ---
   const [isLoading, setIsLoading] = useState(false);
@@ -110,7 +111,7 @@ export default function BookingTab({
           <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter text-center">Ruangan Ditambah</h1>
           <p className="text-gray-500 font-normal mt-2">Data ruangan baru telah berhasil disimpan.</p>
         </div>
-      ), { duration: 3000, position: 'top-center' });
+      ), { duration: 2000, position: 'top-center' });
       setNewRoom({ name: "", capacity: "" });
       setPreviewUrl(null);
       setSelectedFile(null);
@@ -167,7 +168,7 @@ export default function BookingTab({
           <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter text-center">Berhasil Diperbarui</h1>
           <p className="text-gray-500 font-normal mt-2 text-center">Data perubahan ruangan telah disimpan.</p>
         </div>
-      ), { duration: 3000, position: 'top-center' });
+      ), { duration: 2000, position: 'top-center' });
       setIsEditingRoom(false);
       setSelectedFile(null);
       fetchRooms();
@@ -175,10 +176,32 @@ export default function BookingTab({
     finally { setIsLoading(false); }
   };
 
+  interface ToggleResponse {
+    success: boolean;
+    isActive: boolean;
+  }
+
+  const handleToggleRoomStatus = async (id: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.patch<ToggleResponse>(`${API}/api/rooms/${id}/toggle`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data.success) {
+        // toast.success(currentStatus ? "Ruangan dinonaktifkan" : "Ruangan diaktifkan kembali");
+        fetchRooms(); // Refresh data ruangan
+        if (selected === id) setSelected(null); // Deselect jika ruangan yang aktif dinonaktifkan
+      }
+    } catch (err) {
+      toast.error("Gagal mengubah status ruangan");
+    }
+  };
+
   // --- LOGIKA BOOKING ---
   const handleShowInfo = async (roomName: string) => {
     if (!selectedDate) {
-      toast.error("⚠️ Silakan pilih tanggal terlebih dahulu di form!");
+      toast.error("⚠️ Silahkan pilih tanggal terlebih dahulu di form!");
       return;
     }
     try {
@@ -279,6 +302,82 @@ export default function BookingTab({
     fetchAvailability();
   }, [selected, selectedDate, roomsData, editingBooking]); // Tambahkan editingBooking di dependency
 
+  //code baru
+  const showFullBookedToast = (roomName: string) => {
+    toast.custom((t) => (
+      <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-2xl rounded-3xl pointer-events-auto flex flex-col items-center p-10 border-4 border-red-500`}>
+        <div className="bg-red-100 p-4 rounded-full mb-4">
+          <X className="text-red-600 scale-[2]" size={40} />
+        </div>
+        <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter text-center leading-none">Ruangan Penuh</h1>
+        <p className="text-gray-500 font-normal mt-4 text-center">
+          Maaf, <b className="text-black">{roomName}</b> sudah <span className="text-red-600 font-bold">Full Booked</span> pada tanggal tersebut. Silakan pilih ruangan atau tanggal lain.
+        </p>
+      </div>
+    ), { duration: 3000, position: 'top-center' });
+  };
+
+  // 2. Logika Monitoring & Proteksi Otomatis (Solusi untuk Bug Anda)
+  useEffect(() => {
+    const validateCurrentSelection = async () => {
+      // Hanya jalan jika user SUDAH memilih ruangan DAN SUDAH mengisi tanggal
+      if (selected && selectedDate) {
+        const selectedRoom = roomsData.find(r => r.id === selected);
+        if (!selectedRoom) return;
+
+        try {
+          const res = await fetch(`${API}/api/check-availability`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ room: selectedRoom.name, date: selectedDate }),
+          });
+          const data = await res.json();
+
+          // Jika API mengembalikan available slots KOSONG []
+          if (data.available && data.available.length === 0) {
+            // JIKA ini bukan sedang mode edit (atau jika sedang edit tapi ruangan memang penuh total)
+            if (!editingBooking || (editingBooking && selectedRoom.name !== editingBooking.room)) {
+                // setSelected(null); // BATALKAN pilihan otomatis (Auto-Eject)
+                setTimeStart("");  // Reset jam
+                setTimeEnd("");    // Reset jam
+                showFullBookedToast(selectedRoom.name); // Munculkan toast besar
+            }
+          }
+        } catch (err) {
+          console.error("Gagal validasi ketersediaan");
+        }
+      }
+    };
+
+    validateCurrentSelection();
+  }, [selected, selectedDate]); // MEMANTAU PERUBAHAN RUANGAN ATAU TANGGAL
+
+  // 3. Logika Update fullBookedRooms untuk visual tombol (Hanya visual)
+  useEffect(() => {
+    const checkAllRoomsAvailability = async () => {
+      if (!selectedDate || roomsData.length === 0) {
+        setFullBookedRooms([]);
+        return;
+      }
+      const fullRooms: string[] = [];
+      await Promise.all(roomsData.map(async (room) => {
+        try {
+          const res = await fetch(`${API}/api/check-availability`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ room: room.name, date: selectedDate }),
+          });
+          const data = await res.json();
+          if (data.available && data.available.length === 0) {
+            fullRooms.push(room.name);
+          }
+        } catch (err) {}
+      }));
+      setFullBookedRooms(fullRooms);
+    };
+    checkAllRoomsAvailability();
+  }, [selectedDate, roomsData]);
+
   useEffect(() => {
     if (editingBooking && roomsData.length > 0) {
       // 1. Cari ID ruangan berdasarkan nama yang ada di data booking
@@ -323,11 +422,16 @@ export default function BookingTab({
   };
 
 const handleSubmit = async () => {
-    if (!bookingData.room || !bookingData.date || !bookingData.startTime || !bookingData.endTime || !bookingData.agenda) {
-      toast.error("⚠️ Mohon lengkapi semua data!");
-      return;
-    }
-    setIsLoading(true);
+  if (availability.length === 0 && (!editingBooking || roomsData.find(r => r.id === selected)?.name !== editingBooking.room)) {
+    toast.error("Ruangan ini sudah penuh pada tanggal tersebut!");
+    return;
+  }
+
+  if (!bookingData.room || !bookingData.date || !bookingData.startTime || !bookingData.endTime || !bookingData.agenda) {
+    toast.error("⚠️ Mohon lengkapi semua data!");
+    return;
+  }
+  setIsLoading(true);
     try {
       const endpoint = editingBooking ? `${API}/api/book/${bookingData.id}` : `${API}/api/book`;
       const res = await fetch(endpoint, {
@@ -350,7 +454,7 @@ const handleSubmit = async () => {
             <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Pengajuan Berhasil</h1>
             <p className="text-gray-500 font-normal mt-2">Data Anda telah tersimpan ke sistem.</p>
           </div>
-        ), { duration: 3000, position: 'top-center' });
+        ), { duration: 2000, position: 'top-center' });
       }
 
       // Reset & Callback
@@ -374,7 +478,7 @@ const handleSubmit = async () => {
             <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">Pengajuan Gagal</h1>
             <p className="text-gray-500 font-normal mt-2 text-center">{err.message}</p>
           </div>
-        ), { duration: 4000, position: 'top-center' });
+        ), { duration: 2000, position: 'top-center' });
       } else {
         // Log error ke konsol saja jika saat edit terjadi kegagalan, atau biarkan kosong sesuai permintaan
         console.error("Gagal update booking:", err.message);
@@ -393,29 +497,38 @@ const handleSubmit = async () => {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {roomsData.map((room) => (
               <div key={room.id} 
-                className={`relative border-2 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 ${selected === room.id ? "border-blue-600 shadow-xl ring-2 ring-blue-100" : "border-gray-200 shadow-sm"}`}>
+                className={`relative border-2 rounded-2xl flex flex-col transition-all duration-300 
+                    ${
+                      // JIKA Full Booked, gunakan border abu-abu biasa (menghilangkan line biru)
+                      fullBookedRooms.includes(room.name) 
+                        ? "border-gray-200 shadow-sm" 
+                        // JIKA Tidak Full Booked dan terpilih, baru gunakan line biru
+                        : selected === room.id 
+                          ? "border-blue-600 shadow-xl ring-2 ring-blue-100" 
+                          : "border-gray-200 shadow-sm"
+                    }
+                    ${!room.isActive ? "opacity-75 grayscale-[0.5]" : ""}`}
+              >
                 
-                {/* Admin Controls */}
+                {/* Overlay Label Jika Nonaktif */}
+                {!room.isActive && (
+                  <div className="absolute top-14 left-0 right-0 z-20 bg-red-600 text-white text-[10px] py-1 text-center font-black uppercase tracking-widest rotate-[-5deg] shadow-lg">
+                    Sedang Dinonaktifkan
+                  </div>
+                )}
+
+                {/* Admin Controls (Tombol Edit & Hapus tetap ada di atas) */}
                 {userRole === "admin" && (
                   <div className="absolute top-2 right-2 z-10 flex gap-1">
                     <button 
-                      onClick={(e) => {
-                        e.stopPropagation(); // <--- PENTING: Mencegah card terpilih
-                        setEditingRoomData(room); 
-                        setIsEditingRoom(true); 
-                        setSelectedFile(null);
-                        setPreviewUrl(`${API}${room.imageUrl}`);
-                      }}
+                      onClick={(e) => { e.stopPropagation(); setEditingRoomData(room); setIsEditingRoom(true); setPreviewUrl(`${API}${room.imageUrl}`); }}
                       className="p-2 !bg-white border border-gray-200 shadow-sm rounded-full text-blue-600 hover:!bg-blue-600 hover:!text-white transition"
                     >
                       <Edit size={14} />
                     </button>
-    
+
                     <button 
-                      onClick={(e) => {
-                        e.stopPropagation(); // <--- PENTING: Mencegah card terpilih
-                        handleDeleteRoom(room.id);
-                      }}
+                      onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room.id); }}
                       className="p-2 !bg-white border border-gray-200 shadow-sm rounded-full text-red-600 hover:!bg-red-600 hover:!text-white transition"
                     >
                       <Trash2 size={14} />
@@ -423,32 +536,86 @@ const handleSubmit = async () => {
                   </div>
                 )}
 
-                <div className="h-44 w-full bg-gray-100">
+                <div className="h-44 w-full bg-gray-100 relative overflow-hidden rounded-t-[14px]">
                   <img 
                     src={room.imageUrl ? `${API}${room.imageUrl}` : "/assets/default-room.jpg"} 
                     alt={room.name} 
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full object-cover ${!room.isActive ? "brightness-50" : ""}`}
                   />
                 </div>
 
-                <div className="p-4 flex flex-col flex-grow bg-white">
+                <div className="p-4 flex flex-col flex-grow bg-white rounded-b-[14px] relative">
                   <div className="flex justify-between items-start mb-1">
-                    <h3 className="text-lg leading-tight text-black">{room.name}</h3>
-                    <button 
-                      onClick={() => handleShowInfo(room.name)} 
-                      title="Info detail peminjam" // <--- Tambahkan ini
-                      className="p-1.5 bg-blue-50 text-blue-400 rounded-full hover:bg-blue-600 hover:text-white transition shadow-sm"
-                    >
-                      <Info size={18} />
-                    </button>
+                    <h3 className={`text-lg leading-tight ${!room.isActive ? "text-gray-400 line-through" : "text-black"}`}>
+                      {room.name}
+                    </h3>
+                    {/* Container Ikon Info */}
+                    <div className="relative group flex items-center justify-center">
+                      <button 
+                        onClick={() => handleShowInfo(room.name)} 
+                        className="p-1.5 bg-blue-50 text-blue-400 rounded-full hover:bg-blue-600 hover:text-white transition shadow-sm"
+                      >
+                        <Info size={18} />
+                      </button>
+
+                      {/* Tooltip Element - Tambahkan z-50 dan whitespace-nowrap */}
+                      <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center z-50">
+                        <span className="relative z-10 p-2 text-xs leading-none text-white whitespace-nowrap bg-gray-800 rounded shadow-lg font-normal">
+                          Info detail peminjam
+                        </span>
+                        <div className="w-3 h-3 -mt-2 rotate-45 bg-gray-800"></div>
+                      </div>
+                    </div>
+                    
                   </div>
                   <p className="text-xs font-normal text-gray-500 mb-4 italic">Kapasitas: {room.capacity}</p>
-                  <button 
-                    onClick={() => setSelected(room.id)} 
-                    className={`w-full py-2.5 rounded-xl font-bold transition-all active:scale-95 ${selected === room.id ? "bg-blue-600 text-white shadow-lg" : "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"}`}
-                  >
-                    {selected === room.id ? "Terpilih" : "Pilih Ruangan"}
-                  </button>
+                  
+                  <div className="flex flex-col gap-2">
+                    {/* Tombol Pilih Ruangan (Disable jika nonaktif) */}
+                    {/* Tombol Pilih Ruangan */}
+                    <button 
+                      onClick={() => {
+                        if (room.isActive && !fullBookedRooms.includes(room.name)) {
+                          setSelected(room.id);
+                        }
+                      }} 
+                      // Tombol di-disable jika nonaktif ATAU jika full booked (kecuali sedang mode edit ruangan tersebut)
+                      disabled={!room.isActive || (fullBookedRooms.includes(room.name) && selected !== room.id)}
+                      className={`w-full py-2.5 rounded-xl font-bold transition-all active:scale-95 
+                        ${!room.isActive 
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
+                            : fullBookedRooms.includes(room.name)
+                              ? "bg-red-50 text-red-500 cursor-not-allowed border border-red-100" // Merah jika full booked
+                              : selected === room.id 
+                                ? "bg-blue-600 text-white shadow-lg" 
+                                : "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"
+                        }`}
+                    >
+                      {/* LOGIKA TEKS TOMBOL: Full Booked diprioritaskan di atas Terpilih */}
+                      {!room.isActive 
+                        ? "Tidak Tersedia" 
+                        : fullBookedRooms.includes(room.name) 
+                          ? "Full Booked" 
+                          : selected === room.id 
+                            ? "Terpilih" 
+                            : "Pilih Ruangan"
+                      }
+                    </button>
+
+                    {/* TOMBOL KHUSUS ADMIN: Toggle Nonaktifkan */}
+                    {userRole === "admin" && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleToggleRoomStatus(room.id); }}
+                        className={`w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all border
+                          ${room.isActive 
+                            ? "border-red-200 text-red-500 hover:bg-red-500 hover:text-white" 
+                            : "border-green-200 text-green-500 hover:bg-green-500 hover:text-white"
+                          }`}
+                      >
+                        {room.isActive ? "Nonaktifkan Ruangan" : "Aktifkan Ruangan"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -496,13 +663,26 @@ const handleSubmit = async () => {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm mb-1 font-bold">Jam Kosong</label>
+            <label className="block text-sm mb-1 font-bold">Jam Kosong Ruangan</label>
             <div className="w-full border rounded-lg px-3 py-2 bg-gray-50 text-gray-700 font-normal min-h-[50px]">
               {availability.length > 0 ? (
                 <ul className="text-sm">
-                  {availability.map((slot, idx) => <li key={idx} className="flex justify-between border-b last:border-0 py-1"><span>{slot.startTime} - {slot.endTime}</span></li>)}
+                  {availability.map((slot, idx) => (
+                    <li key={idx} className="flex justify-between border-b last:border-0 py-1">
+                      <span>{slot.startTime} - {slot.endTime}</span>
+                    </li>
+                  ))}
                 </ul>
-              ) : <span className="text-gray-400 text-xs italic">(Pilih ruangan & tanggal)</span>}
+              ) : (
+                <span className="text-gray-400 text-xs italic">
+                  {/* LOGIKA BARU: Jika ruangan dipilih & tanggal dipilih, tapi availability kosong */}
+                  {selected && selectedDate ? (
+                    <b className="text-red-500 not-italic font-bold">Full Booked</b>
+                  ) : (
+                    "(Pilih ruangan & tanggal)"
+                  )}
+                </span>
+              )}
             </div>
           </div>
 
@@ -557,7 +737,7 @@ const handleSubmit = async () => {
               top: '30%', // Menggeser posisi "top" agak ke tengah layar
             }}
             toastOptions={{
-              duration: 3000,
+              duration: 2000,
             }}
           />
         </div>

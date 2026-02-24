@@ -7,7 +7,7 @@ const API = import.meta.env.VITE_API_BASE_URL;
 interface LoginProps {
   onLogin: (user: any, token: string) => void;
   onSwitchToRegister: () => void;
-  nForgotPassword: () => void;
+  onForgotPassword: () => void;
 }
 
 export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginProps) {
@@ -192,7 +192,7 @@ export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }:
               type="text"
               placeholder="Username atau E-Mail"
               value={identifier}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="w-10/12 px-3 py-2 rounded-full border bg-white border-gray-300 text-black text-base"
               required
             />
