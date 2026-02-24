@@ -41,7 +41,7 @@ export default function ForgotPassword({ onBackToLogin }: { onBackToLogin: () =>
   };
 
   return (
-    <div className="flex min-h-screen w-screen relative bg-blue-900 justify-center items-center">
+    <div className="fixed inset-0 min-h-screen w-full bg-blue-900 flex items-center justify-center overflow-y-auto">
       <div className="relative z-10 w-full flex flex-col items-center justify-center px-6">
         <div className="max-w-md w-full bg-white bg-opacity-10 p-8 rounded-3xl backdrop-blur-md border border-white border-opacity-20 text-white shadow-xl">
           

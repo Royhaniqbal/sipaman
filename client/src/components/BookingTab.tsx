@@ -510,24 +510,28 @@ const handleSubmit = async () => {
         <div className="flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {roomsData.map((room) => (
-              <div key={room.id} 
-                className={`relative border-2 rounded-2xl flex flex-col transition-all duration-300 
-                    ${
-                      // JIKA Full Booked, gunakan border abu-abu biasa (menghilangkan line biru)
-                      fullBookedRooms.includes(room.name) 
-                        ? "border-gray-200 shadow-sm" 
-                        // JIKA Tidak Full Booked dan terpilih, baru gunakan line biru
-                        : selected === room.id 
-                          ? "border-blue-600 shadow-xl ring-2 ring-blue-100" 
-                          : "border-gray-200 shadow-sm"
+              <div 
+                key={room.id} 
+                className={`relative border-2 rounded-2xl flex flex-col transition-all duration-300 ease-out
+                    /* EFEK 3D & INTERAKSI */
+                    ${!room.isActive || (fullBookedRooms.includes(room.name) && selected !== room.id)
+                      ? "opacity-75 grayscale-[0.3] cursor-not-allowed shadow-sm" // Jika tidak bisa dipilih
+                      : "hover:-translate-y-2 hover:shadow-2xl hover:scale-[1.02] cursor-pointer" // Efek melayang 3D
                     }
-                    ${!room.isActive ? "opacity-75 grayscale-[0.5]" : ""}`}
+                    /* LOGIKA WARNA BORDER */
+                    ${fullBookedRooms.includes(room.name) 
+                        ? "border-gray-200" 
+                        : selected === room.id 
+                          ? "border-blue-600 shadow-2xl ring-4 ring-blue-50 -translate-y-2" // Tetap melayang jika terpilih
+                          : "border-gray-200 bg-white"
+                    }`}
+                style={{ perspective: "1000px" }} // Memberikan konteks kedalaman 3D
               >
                 
                 {/* Overlay Label Jika Nonaktif */}
                 {!room.isActive && (
                   <div className="absolute top-14 left-0 right-0 z-20 bg-red-600 text-white text-[10px] py-1 text-center font-black uppercase tracking-widest rotate-[-5deg] shadow-lg">
-                    Sedang Dinonaktifkan
+                    TUTUP
                   </div>
                 )}
 
@@ -554,7 +558,9 @@ const handleSubmit = async () => {
                   <img 
                     src={room.imageUrl ? `${API}${room.imageUrl}` : "/assets/default-room.jpg"} 
                     alt={room.name} 
-                    className={`w-full h-full object-cover ${!room.isActive ? "brightness-50" : ""}`}
+                    className={`w-full h-full object-cover transition-transform duration-500 
+                      ${room.isActive && !fullBookedRooms.includes(room.name) ? "group-hover:scale-110" : ""}
+                      ${!room.isActive ? "brightness-50" : ""}`}
                   />
                 </div>
 
@@ -590,30 +596,23 @@ const handleSubmit = async () => {
                     <button 
                       onClick={() => {
                         if (room.isActive && !fullBookedRooms.includes(room.name)) {
-                          setSelected(room.id);
+                          setSelected(selected === room.id ? null : room.id);
                         }
                       }} 
-                      // Tombol di-disable jika nonaktif ATAU jika full booked (kecuali sedang mode edit ruangan tersebut)
                       disabled={!room.isActive || (fullBookedRooms.includes(room.name) && selected !== room.id)}
-                      className={`w-full py-2.5 rounded-xl font-bold transition-all active:scale-95 
+                      /* Gunakan border-0 untuk mematikan border, dan focus:ring-0 untuk mematikan garis saat diklik */
+                      className={`w-full py-2.5 rounded-xl font-bold transition-all duration-300 active:scale-95 !border-none !outline-none focus:!ring-0
                         ${!room.isActive 
                             ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
                             : fullBookedRooms.includes(room.name)
-                              ? "bg-red-50 text-red-500 cursor-not-allowed border border-red-100" // Merah jika full booked
+                              ? "bg-red-50 text-red-500 cursor-not-allowed" 
                               : selected === room.id 
-                                ? "bg-blue-600 text-white shadow-lg" 
+                                ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
                                 : "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"
                         }`}
                     >
-                      {/* LOGIKA TEKS TOMBOL: Full Booked diprioritaskan di atas Terpilih */}
-                      {!room.isActive 
-                        ? "Tidak Tersedia" 
-                        : fullBookedRooms.includes(room.name) 
-                          ? "Full Booked" 
-                          : selected === room.id 
-                            ? "Terpilih" 
-                            : "Pilih Ruangan"
-                      }
+                      {/* Logika teks tetap sama */}
+                      {!room.isActive ? "Tidak Tersedia" : fullBookedRooms.includes(room.name) ? "Full Booked" : selected === room.id ? "Terpilih" : "Pilih Ruangan"}
                     </button>
 
                     {/* TOMBOL KHUSUS ADMIN: Toggle Nonaktifkan */}

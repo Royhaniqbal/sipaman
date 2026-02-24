@@ -105,9 +105,12 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
           return (
             <div
               key={item._id || item.id || idx}
-              className={`p-5 border rounded-2xl shadow-sm bg-white flex flex-col md:flex-row justify-between items-start transition-all ${
-                past ? "opacity-60 bg-gray-50" : "hover:border-blue-200 shadow-md"
-              }`}
+              className={`p-5 border-y border-r rounded-2xl bg-white flex flex-col md:flex-row justify-between items-start transition-all duration-300 ease-in-out
+                ${past 
+                  ? "opacity-60 bg-gray-50 border-l-8 border-l-gray-300 cursor-not-allowed" 
+                  : "border-l-8 border-l-gray-300 hover:border-l-blue-600 hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.01] cursor-pointer"
+                }`}
+              style={{ transformStyle: "preserve-3d" }} // Menambah kesan kedalaman 3D
             >
               <div className={`grid grid-cols-[110px_10px_1fr] gap-y-1 w-full font-normal ${past ? "text-gray-400" : "text-black"}`}>
               <p className={`text-sm font-bold uppercase text-[10px] self-center ${past ? "text-gray-400" : "text-black"}`}>Ruangan</p>
@@ -122,9 +125,14 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
               <p className="text-sm">:</p>
               <p className="text-sm font-bold">{item.pic} <span className={past ? "text-gray-400" : "text-gray-400"}>/ {item.unitKerja || "-"}</span></p>
 
-              <p className={`text-sm font-bold uppercase text-[10px] self-center ${past ? "text-gray-400" : "text-black"}`}>Agenda</p>
-              <p className="text-sm">:</p>
-              <p className={`text-sm font-bold ${past ? "text-gray-400" : "text-gray-700"}`}>"{item.agenda || "-"}"</p>
+              {/* Ganti bagian agenda sebelumnya dengan ini */}
+              <p className={`text-sm font-bold uppercase text-[10px] self-start mt-1 ${past ? "text-gray-400" : "text-black"}`}>
+                Agenda
+              </p>
+              <p className="text-sm mt-1">:</p>
+              <p className={`text-sm font-bold break-words whitespace-normal overflow-hidden ${past ? "text-gray-400" : "text-gray-700"}`}>
+                "{item.agenda || "-"}"
+              </p>
             </div>
 
             <div className="flex flex-row md:flex-col gap-2 w-full md:w-32 mt-4 md:mt-0 border-t md:border-t-0 pt-4 md:pt-0">
