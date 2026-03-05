@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { Eye, EyeOff, Loader2 } from "lucide-react"; // Tambah icon Building
 
@@ -34,6 +34,23 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isAdminFull, setIsAdminFull] = useState(false);
+
+  useEffect(() => {
+    const checkAdminCount = async () => {
+      try {
+        const res = await axios.get(`${API}/auth/admin-count`) as { data: { count: number } };
+        // const res = await axios.get(`${API}/api/auth/admin-count`); // Pastikan endpoint ini ada di backend
+        if (res.data.count >= 2) {
+          setIsAdminFull(true);
+          setRole("user"); // Paksa role ke user jika admin sudah penuh
+        }
+      } catch (err) {
+        console.error("Gagal mengecek jumlah admin", err);
+      }
+    };
+    checkAdminCount();
+  }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +61,7 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
 
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/api/auth/register`, {
+      const res = await axios.post(`${API}/auth/register`, {
         username,
         email,
         password,
@@ -172,13 +189,15 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
               </div>
 
               {/* 🔹 Dropdown Role Desktop */}
-              <div className="relative w-8/12">
-                <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-5 py-2 rounded-full border border-gray-300 bg-white text-black text-lg" required>
-                  <option value="user">Daftar sebagai User</option>
-                  <option value="admin">Daftar sebagai Admin</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-6 flex items-center text-gray-500">▼</div>
-              </div>
+              {!isAdminFull && (
+                <div className="relative w-8/12">
+                  <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-5 py-2 rounded-full border border-gray-300 bg-white text-black text-lg" required>
+                    <option value="user">Daftar sebagai User</option>
+                    <option value="admin">Daftar sebagai Admin</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-6 flex items-center text-gray-500">▼</div>
+                </div>
+              )}
 
 
               {loading && (
@@ -284,13 +303,15 @@ export default function Register({ onRegister, onSwitchToLogin }: RegisterProps)
             </div>
 
             {/* 🔹 Dropdown Role Mobile */}
-            <div className="relative w-10/12">
-              <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-4 py-2 rounded-full border border-gray-300 bg-white text-black text-base" required>
-                <option value="user">Daftar sebagai User</option>
-                <option value="admin">Daftar sebagai Admin</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-gray-500">▼</div>
-            </div>
+            {!isAdminFull && (
+              <div className="relative w-10/12">
+                <select value={role} onChange={(e) => setRole(e.target.value)} className="appearance-none w-full px-4 py-2 rounded-full border border-gray-300 bg-white text-black text-base" required>
+                  <option value="user">Daftar sebagai User</option>
+                  <option value="admin">Daftar sebagai Admin</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center text-gray-500">▼</div>
+              </div>
+            )}
 
             {/* 🔹 Dropdown Unit Kerja Mobile */}
 

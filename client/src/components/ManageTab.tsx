@@ -18,7 +18,11 @@ const unitOptions = [
   "Sekretariat BNSP",
 ];
 
-export default function ManageTab() {
+interface ManageTabProps {
+  onLogout: () => void;
+}
+
+export default function ManageTab({ onLogout }: ManageTabProps) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [unitKerja, setUnitKerja] = useState("");
@@ -33,7 +37,7 @@ export default function ManageTab() {
       if (!token) return;
 
       try {
-        const res = await axios.get(`${API}/api/auth/me`, {
+        const res = await axios.get(`${API}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const fetchedUser = (res.data as any).user || res.data;
@@ -54,7 +58,7 @@ export default function ManageTab() {
     setIsLoading(true); // 👈 Mulai loading
     try {
       await axios.put(
-        `${API}/api/auth/update-profile`, 
+        `${API}/auth/update-profile`, 
         { username, email, unitKerja, phone },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -71,25 +75,25 @@ export default function ManageTab() {
   const handleLogout = () => {
     if (confirm("Apakah Anda yakin ingin keluar?")) {
       localStorage.removeItem("token");
-      window.location.reload();
+      localStorage.removeItem("user");
+      
+      onLogout();
     }
   };
 
   // ✅ 4. Fungsi Hapus Akun
   const handleDeleteAccount = async () => {
-    const confirmDelete = confirm(
-      "PERINGATAN! Akun Anda akan dihapus permanen. Tindakan ini tidak dapat dibatalkan. Lanjutkan?"
-    );
-    
-    if (confirmDelete) {
+    if (confirm("PERINGATAN! Akun Anda akan dihapus permanen. Lanjutkan?")) {
       const token = localStorage.getItem("token");
       try {
-        await axios.delete(`${API}/api/auth/delete-account`, {
+        await axios.delete(`${API}/auth/delete-account`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         alert("Akun Anda telah dihapus.");
+        
         localStorage.removeItem("token");
-        window.location.reload();
+        localStorage.removeItem("user");
+        onLogout(); // Gunakan onLogout di sini juga
       } catch (err: any) {
         toast.error("Gagal menghapus akun.");
       }

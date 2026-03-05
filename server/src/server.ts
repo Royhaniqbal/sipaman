@@ -27,9 +27,9 @@ const SECRET = process.env.JWT_SECRET || "your_secret_key";
 app.use(cors());
 app.use(bodyParser.json());
 
-const uploadDir = "uploads/";
+const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
@@ -48,14 +48,19 @@ const upload = multer({
 });
 
 // EXPOSE FOLDER UPLOAD AGAR BISA DIAKSES URL ---
+// PERBAIKAN: Gunakan process.cwd() agar mengarah ke root folder api-sipaman
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+// TAMBAHKAN INI JUGA (Opsional tapi disarankan agar URL /api/uploads juga jalan)
+app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
+console.log("Lokasi Fisik Uploads:", path.join(process.cwd(), "uploads"));
 
 // ✅ Connect ke MySQL
 connectDB().then(async () => {
   try {
     // alter: true akan memeriksa tabel dan menambahkan kolom yang kurang otomatis
     // await sequelize.sync({ alter: true });
-    await sequelize.sync({ alter: false });
+    await sequelize.sync({ alter: true });
     console.log("✅ Database synced and columns updated!");
   } catch (err) {
     console.error("❌ Sync failed:", err);
@@ -63,63 +68,6 @@ connectDB().then(async () => {
 });
 
 app.use("/api/auth", authRoutes);
-
-// ✅ Endpoint: Cek ketersediaan & Ambil Detail Peminjam (code lama)
-// app.post("/api/check-availability", async (req: Request, res: Response) => {
-//   const { room, date } = req.body;
-//   const roomData = await Room.findOne({ where: { name: room } });
-//     if (roomData && !roomData.isActive) {
-//       return res.status(403).json({ 
-//         success: false, 
-//         message: "⚠️ Ruangan ini sedang tidak tersedia untuk dipinjam (Dinonaktifkan Admin)." 
-//       });
-//     }
-
-//   if (!room || !date) {
-//     return res.status(400).json({ error: "Room dan date wajib diisi" });
-//   }
-
-//   try {
-//     // 1. Ambil semua data booking untuk ruangan dan tanggal tersebut
-//     const roomBookings = await Booking.findAll({ 
-//       where: { room, date },
-//       order: [['startTime', 'ASC']] 
-//     });
-    
-//     // 2. Tentukan jam kerja operasional
-//     const WORKING_HOURS = [{ startTime: "07:30", endTime: "17:00" }];
-//     let availableSlots = [...WORKING_HOURS];
-
-//     // 3. Algoritma menghitung slot kosong
-//     roomBookings.forEach((booked: any) => {
-//       availableSlots = availableSlots.flatMap((slot) => {
-//         if (booked.startTime >= slot.endTime || booked.endTime <= slot.startTime) {
-//           return [slot];
-//         }
-//         const result: { startTime: string; endTime: string }[] = [];
-//         if (booked.startTime > slot.startTime) {
-//           result.push({ startTime: slot.startTime, endTime: booked.startTime });
-//         }
-//         if (booked.endTime < slot.endTime) {
-//           result.push({ startTime: booked.endTime, endTime: slot.endTime });
-//         }
-//         return result;
-//       });
-//     });
-
-//     // 4. Kirim respon tunggal yang berisi slot kosong DAN daftar peminjam
-//     return res.json({ 
-//       room, 
-//       date, 
-//       available: availableSlots, 
-//       booked: roomBookings // Data ini yang akan tampil di tabel pop-up Frontend
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Error check-availability:", error);
-//     return res.status(500).json({ error: "Internal server error" });
-//   }
-// });
 
 // ✅ Endpoint: Cek ketersediaan & Ambil Detail Peminjam (code baru)
 app.post("/api/check-availability", async (req: Request, res: Response) => {
@@ -400,10 +348,8 @@ app.delete("/api/rooms/:id", isAdmin, async (req: Request, res: Response) => {
     }
 
     if (room.imageUrl) {
-      const filePath = path.join(process.cwd(), room.imageUrl);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      const oldPath = path.join(process.cwd(), room.imageUrl); 
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     }
     await room.destroy();
 
@@ -452,8 +398,12 @@ app.put("/api/rooms/:id", isAdmin, upload.single("image"), async (req: Request, 
   }
 });
 
-app.get("/", (_req: Request, res: Response) => {
-  res.send("✅ API MySQL running...");
+// app.get("/", (_req: Request, res: Response) => {
+//   res.send("✅ API MySQL running...");
+// });
+// Tambahkan ini agar aplikasi merespons di / maupun /api
+app.get(["/", "/api"], (_req, res) => {
+  res.send("✅ API SIPAMAN Berhasil Berjalan & Terkoneksi!");
 });
 
 app.listen(PORT, () => {

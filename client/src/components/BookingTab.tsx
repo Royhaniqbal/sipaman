@@ -52,7 +52,7 @@ export default function BookingTab({
 
   const fetchRooms = async () => {
     try {
-      const res = await fetch(`${API}/api/rooms`);
+      const res = await fetch(`${API}/rooms`);
       const data = await res.json();
       setRoomsData(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -65,7 +65,7 @@ export default function BookingTab({
       const token = localStorage.getItem("token");
       if (!token) return;
       try {
-        const resUser = await fetch(`${API}/api/auth/me`, {
+        const resUser = await fetch(`${API}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (resUser.ok) {
@@ -100,7 +100,7 @@ export default function BookingTab({
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
-      await axios.post(`${API}/api/rooms`, formData, {
+      await axios.post(`${API}/rooms`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
       });
       toast.custom((t) => (
@@ -134,7 +134,7 @@ export default function BookingTab({
       }
 
       // Menggunakan axios.delete
-      const res = await axios.delete(`${API}/api/rooms/${id}`, { 
+      const res = await axios.delete(`${API}/rooms/${id}`, { 
         headers: { Authorization: `Bearer ${token}` } 
       });
 
@@ -157,7 +157,7 @@ export default function BookingTab({
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
-      await axios.put(`${API}/api/rooms/${editingRoomData.id}`, formData, {
+      await axios.put(`${API}/rooms/${editingRoomData.id}`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
       });
       toast.custom((t) => (
@@ -184,7 +184,7 @@ export default function BookingTab({
   const handleToggleRoomStatus = async (id: number) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.patch<ToggleResponse>(`${API}/api/rooms/${id}/toggle`, {}, {
+      const res = await axios.patch<ToggleResponse>(`${API}/rooms/${id}/toggle`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -219,7 +219,7 @@ export default function BookingTab({
     }
 
     try {
-      const res = await fetch(`${API}/api/check-availability`, {
+      const res = await fetch(`${API}/check-availability`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ room: roomName, date: selectedDate }),
@@ -260,7 +260,7 @@ export default function BookingTab({
       const selectedRoomName = roomsData.find(r => r.id === selected)?.name;
       if (selectedRoomName && selectedDate) {
         try {
-          const res = await fetch(`${API}/api/check-availability`, {
+          const res = await fetch(`${API}/check-availability`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ room: selectedRoomName, date: selectedDate }),
@@ -340,7 +340,7 @@ export default function BookingTab({
         if (!selectedRoom) return;
 
         try {
-          const res = await fetch(`${API}/api/check-availability`, {
+          const res = await fetch(`${API}/check-availability`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ room: selectedRoom.name, date: selectedDate }),
@@ -376,7 +376,7 @@ export default function BookingTab({
       const fullRooms: string[] = [];
       await Promise.all(roomsData.map(async (room) => {
         try {
-          const res = await fetch(`${API}/api/check-availability`, {
+          const res = await fetch(`${API}/check-availability`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ room: room.name, date: selectedDate }),
@@ -447,7 +447,7 @@ const handleSubmit = async () => {
   }
   setIsLoading(true);
     try {
-      const endpoint = editingBooking ? `${API}/api/book/${bookingData.id}` : `${API}/api/book`;
+      const endpoint = editingBooking ? `${API}/book/${bookingData.id}` : `${API}/book`;
       const res = await fetch(endpoint, {
         method: editingBooking ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -556,7 +556,7 @@ const handleSubmit = async () => {
 
                 <div className="h-44 w-full bg-gray-100 relative overflow-hidden rounded-t-[14px]">
                   <img 
-                    src={room.imageUrl ? `${API}${room.imageUrl}` : "/assets/default-room.jpg"} 
+                    src={room.imageUrl ? `${API}${room.imageUrl}` : "/assets/default-room.jpg"}
                     alt={room.name} 
                     className={`w-full h-full object-cover transition-transform duration-500 
                       ${room.isActive && !fullBookedRooms.includes(room.name) ? "group-hover:scale-110" : ""}

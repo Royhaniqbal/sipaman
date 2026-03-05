@@ -28,7 +28,7 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
       if (!token) return;
 
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/my-bookings`, {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/my-bookings`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -53,7 +53,7 @@ export default function ListTab({ history, setHistory }: ListTabProps) {
     if (!confirmCancel) return;
     setLoadingIndex(index);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/cancel-booking`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/cancel-booking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(booking),

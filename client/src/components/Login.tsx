@@ -23,17 +23,45 @@ export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }:
     setLoading(true);
     setError("");
 
+    // try {
+    //   const res = await axios.post(`${API}/auth/login`, {
+    //     identifier,
+    //     password,
+    //   });
+    //   const data = res.data as { user: any; token: string };
+    //   localStorage.setItem("token", data.token);
+    //   onLogin(data.user, data.token);
+    // } catch (err) {
+    //   setError("Username/E-mail atau password salah ❌");
+    // } 
     try {
-      const res = await axios.post(`${API}/api/auth/login`, {
+      const res = await axios.post(`${API}/auth/login`, {
         identifier,
         password,
       });
+      
+      // Beri tahu TypeScript bahwa 'data' memiliki struktur ini
       const data = res.data as { user: any; token: string };
-      localStorage.setItem("token", data.token);
-      onLogin(data.user, data.token);
-    } catch (err) {
-      setError("Username/E-mail atau password salah ❌");
-    } finally {
+
+      // Sekarang pengecekan ini akan aman dan tidak error saat build
+      if (data && data.token) {
+        localStorage.setItem("token", data.token);
+        
+        if (data.user) {
+          localStorage.setItem("user", JSON.stringify(data.user));
+        }
+
+        onLogin(data.user, data.token);
+
+        // Paksa pindah halaman
+        window.location.href = "/"; 
+      } else {
+        setError("Login sukses, tapi server tidak mengirimkan token 🔑");
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Username/E-mail atau password salah ❌");
+    }
+    finally {
       setLoading(false);
     }
   };
@@ -212,6 +240,16 @@ export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }:
                 className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700 bg-white p-1 rounded-full shadow-sm"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+
+            <div className="w-10/12 text-right !-mt-1 pr-4">
+              <button 
+                type="button"
+                onClick={onForgotPassword}
+                className="bg-transparent border-none p-0 text-xs text-white hover:underline opacity-80 hover:opacity-100 transition-opacity"
+              >
+                Lupa password?
               </button>
             </div>
 

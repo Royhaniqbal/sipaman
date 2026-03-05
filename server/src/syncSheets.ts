@@ -37,16 +37,23 @@ const SPREADSHEET_ID = "1ud5WmNwZlactleFzU5U92WgFcUsgAZvAobjSm0cqfxo";
 // ------------------------------
 // 🔹 Sheet name normalizer
 // ------------------------------
+// function getSheetName(room: string): string {
+//   const cleaned = room.trim().replace(/\s+/g, " ").toLowerCase();
+//   const normalizedRooms: Record<string, string> = {
+//     "ballroom": "Ballroom",
+//     "ruang rapat dirjen": "Ruang Rapat Dirjen",
+//     "ruang rapat sesditjen": "Ruang Rapat Sesditjen",
+//     "command center": "Command Center",
+//     "ruang rapat lt2": "Ruang Rapat Lt2",
+//   };
+//   return normalizedRooms[cleaned] || "Sheet1";
+// }
 function getSheetName(room: string): string {
-  const cleaned = room.trim().replace(/\s+/g, " ").toLowerCase();
-  const normalizedRooms: Record<string, string> = {
-    "ballroom": "Ballroom",
-    "ruang rapat dirjen": "Ruang Rapat Dirjen",
-    "ruang rapat sesditjen": "Ruang Rapat Sesditjen",
-    "command center": "Command Center",
-    "ruang rapat lt2": "Ruang Rapat Lt2",
-  };
-  return normalizedRooms[cleaned] || "Sheet1";
+  if (!room) return "Sheet1";
+  
+  // Menghapus spasi berlebih dan merapikan format (Title Case)
+  // Contoh: "ruang rapat menteri (lt 2)" tetap dikirim apa adanya ke Google Sheet
+  return room.trim().replace(/\s+/g, " ");
 }
 
 // ------------------------------------

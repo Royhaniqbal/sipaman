@@ -10,6 +10,16 @@ import { updateProfileInSheets } from "../syncSheets"; // Sesuaikan path file Sy
 const router = express.Router();
 const SECRET = process.env.JWT_SECRET || "your_secret_key";
 
+// ✅ GET ADMIN COUNT (Untuk Frontend mengecek ketersediaan slot admin)
+router.get("/admin-count", async (req, res) => {
+  try {
+    const count = await User.count({ where: { role: "admin" } });
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ message: "Gagal menghitung jumlah admin" });
+  }
+});
+
 export const isAdmin = (req: any, res: any, next: any) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Akses ditolak" });

@@ -22,9 +22,27 @@ interface User {
 function App() {
   const [tab, setTab] = useState('book');
   const [history, setHistory] = useState<any[]>([]); 
-  const [user, setUser] = useState<User | null>(null);
-  //const [authPage, setAuthPage] = useState<"login" | "register">("login"); //code lama
   const [authPage, setAuthPage] = useState<"login" | "register" | "forgot-password">("login");
+  // --- BAGIAN YANG DIPERBAIKI ---
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser && savedUser !== "undefined") {
+      try {
+        return JSON.parse(savedUser);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+  // ------------------------------
+  
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null); // Ini yang membuat tampilan pindah ke Login
+    setAuthPage("login");
+  };
 
   const renderTab = () => {
     switch (tab) {
@@ -33,7 +51,7 @@ function App() {
       case 'booklist': 
         return <ListTab history={history} setHistory={setHistory} />;
       case 'manage': 
-        return <ManageTab />;
+        return <ManageTab onLogout={handleLogout} />;
       default: 
         return <BookingTab setHistory={setHistory} />;
     }
