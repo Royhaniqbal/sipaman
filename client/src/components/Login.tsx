@@ -186,7 +186,7 @@ export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }:
         </div>
 
         <p className="absolute bottom-6 right-[15.5rem] text-[9px] text-white">
-          Dibuat oleh M. Royhan Iqbal
+          Dibuat oleh M. Royhan Iqbal - v2.0
         </p>
       </div>
 

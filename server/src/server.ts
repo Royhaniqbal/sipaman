@@ -17,12 +17,44 @@ import { isAdmin } from "./routes/auth"; // Import middleware isAdmin (jika dile
 import { sequelize } from "./db";
 
 import multer from "multer";
+// import helmet from "helmet";
+// import rateLimit from "express-rate-limit";
+// import sanitizeHtml from "sanitize-html";
 import path from "path";
 import fs from "fs";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const SECRET = process.env.JWT_SECRET || "your_secret_key";
+
+// app.set('trust proxy', 1);
+
+// --- BENTENG 2: HELMET (SECURITY HEADERS) ---
+// app.use(helmet({
+//   contentSecurityPolicy: {
+//     directives: {
+//       "default-src": ["'self'"],
+//       "script-src": ["'self'", "'unsafe-inline'"],
+//       "style-src": ["'self'", "'unsafe-inline'"],
+//       "img-src": ["'self'", "data:", "blob:", "https:", "http:"],
+//       "connect-src": ["'self'", "https://sipaman-binalavotas.kemnaker.go.id", "http://localhost:5000"],
+//     },
+//   },
+//   crossOriginResourcePolicy: { policy: "cross-origin" }
+// }));
+
+// // --- BENTENG 3: RATE LIMITER ---
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 menit
+//   max: 500, // Batas aman untuk testing
+//   message: {
+//     success: false,
+//     message: "Terlalu banyak permintaan, coba lagi nanti."
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
+// app.use("/api/", limiter); // Hanya proteksi jalur API
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -44,7 +76,18 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage,
-  limits: { fileSize: 2 * 1024 * 1024 } // Batas 2MB agar tidak membebani cPanel
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error("Hanya boleh mengunggah file gambar (jpg/png/webp)!"));
+    }
+  }
 });
 
 // EXPOSE FOLDER UPLOAD AGAR BISA DIAKSES URL ---
@@ -130,6 +173,10 @@ app.post("/api/check-availability", async (req: Request, res: Response) => {
 app.post("/api/book", async (req: Request, res: Response) => {
   const { room, date, startTime, endTime, pic, unitKerja, agenda, phone } = req.body;
 
+  // --- BENTENG 4: SANITASI ---
+  // const cleanAgenda = sanitizeHtml(agenda, { allowedTags: [], allowedAttributes: {} });
+  // const cleanUnit = sanitizeHtml(unitKerja, { allowedTags: [], allowedAttributes: {} });
+
   if (!room || !date || !startTime || !endTime || !pic || !unitKerja || !agenda) {
     return res.status(400).json({ success: false, message: "Data tidak lengkap" });
   }
@@ -164,6 +211,12 @@ app.post("/api/book", async (req: Request, res: Response) => {
 
     // 2. Simpan ke Database (Wajib Berhasil)
     const newBooking = await Booking.create({ room, date, startTime, endTime, pic, unitKerja, agenda, phone });
+    // const newBooking = await Booking.create({ 
+    //   room, date, startTime, endTime, pic, 
+    //   unitKerja: cleanUnit, 
+    //   agenda: cleanAgenda, 
+    //   phone 
+    // });
 
     // 3. Sinkron Sheets & WA secara Independen (Jangan pakai 'await' yang menggandeng keduanya)
     

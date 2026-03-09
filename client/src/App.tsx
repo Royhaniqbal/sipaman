@@ -109,7 +109,7 @@ function App() {
                 ? 'text-blue-600 [text-shadow:0_2px_4px_rgba(37,99,235,0.3)]' 
                 : 'text-gray-500 group-hover:text-gray-700'
             }`}>
-              Pinjam Ruangan
+              Reservasi Ruangan
             </span>
             <div className={`h-1 w-5 rounded-full transition-all duration-300 ${tab === 'book' ? 'bg-blue-600 shadow-[0_2px_4px_rgba(37,99,235,0.4)]' : 'bg-transparent'}`}></div>
           </button>
@@ -133,7 +133,7 @@ function App() {
                 ? 'text-blue-600 [text-shadow:0_2px_4px_rgba(37,99,235,0.3)]' 
                 : 'text-gray-500 group-hover:text-gray-700'
             }`}>
-              Riwayat Peminjaman
+              Riwayat Reservasi
             </span>
             <div className={`h-1 w-5 rounded-full transition-all duration-300 ${tab === 'booklist' ? 'bg-blue-600 shadow-[0_2px_4px_rgba(37,99,235,0.4)]' : 'bg-transparent'}`}></div>
           </button>
@@ -186,7 +186,7 @@ function App() {
               ? 'text-blue-600 [text-shadow:0_2px_4px_rgba(37,99,235,0.3)]' 
               : 'text-gray-500'
           }`}>
-            Pinjam Ruangan
+            Reservasi Ruangan
           </span>
         </button>
 
@@ -209,7 +209,7 @@ function App() {
               ? 'text-blue-600 [text-shadow:0_2px_4px_rgba(37,99,235,0.3)]' 
               : 'text-gray-500'
           }`}>
-            Riwayat Peminjaman
+            Riwayat Reservasi
           </span>
         </button>
 

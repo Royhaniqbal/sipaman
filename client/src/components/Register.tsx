@@ -15,11 +15,12 @@ const UNIT_OPTIONS = [
   "Setditjen Binalavotas - Keuangan",
   "Setditjen Binalavotas - PEP",
   "Setditjen Binalavotas - SDMA",
-  "Bina Lemlatvok",
-  "Bina Stankomproglat",
-  "Bina Intala",
-  "Bina Produktivitas",
-  "Bina Lavogan",
+  "Setditjen Binalavotas - PUUKS",
+  "Direktorat Bina Stankomproglat",
+  "Direktorat Bina Lemlatvok",
+  "Direktorat Bina Produktivitas",
+  "Direktorat Bina Intala",
+  "Direktorat Bina Lavogan",
   "Sekretariat BNSP",
 ];
 

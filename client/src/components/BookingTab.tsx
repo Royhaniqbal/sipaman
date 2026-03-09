@@ -581,7 +581,7 @@ const handleSubmit = async () => {
                       {/* Tooltip Element - Tambahkan z-50 dan whitespace-nowrap */}
                       <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center z-50">
                         <span className="relative z-10 p-2 text-xs leading-none text-white whitespace-nowrap bg-gray-800 rounded shadow-lg font-normal">
-                          Info detail peminjam
+                          Info detail pengguna
                         </span>
                         <div className="w-3 h-3 -mt-2 rotate-45 bg-gray-800"></div>
                       </div>
@@ -740,7 +740,7 @@ const handleSubmit = async () => {
                 <span>Memproses...</span>
               </>
             ) : (
-              editingBooking ? "Simpan Perubahan" : "Kirim Pengajuan"
+              editingBooking ? "Simpan Perubahan" : "Kirim Pengajuan Reservasi"
             )}
           </button>
           {/* <Toaster position="top-center" /> */}
@@ -818,7 +818,7 @@ const handleSubmit = async () => {
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
             <div className="p-4 border-b flex justify-between items-center bg-blue-50 rounded-t-2xl">
               <div>
-                <h3 className="text-lg font-bold text-blue-900">Peminjam: {modalRoomName}</h3>
+                <h3 className="text-lg font-bold text-blue-900">Daftar Pengguna {modalRoomName}</h3>
                 <p className="text-xs font-normal text-gray-600">{selectedDate}</p>
               </div>
               <button 
